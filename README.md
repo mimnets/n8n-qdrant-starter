@@ -27,6 +27,16 @@ Perfect for: OCI free tier, budget VPS, and homelab servers.
 - **n8n** — workflow automation engine with 400+ integrations
 - **Qdrant** — vector database for semantic search, RAG, and AI memory
 
+## ⚠️ Important
+
+**The default `.env` values are placeholders.** If you don't replace them before starting the stack, n8n will fail to run — the encryption key and JWT secret must be properly generated 64-character hex strings. Run `./scripts/setup.sh` to generate secure values automatically, or manually generate them:
+
+```bash
+openssl rand -hex 32  # for N8N_ENCRYPTION_KEY and N8N_USER_MANAGEMENT_JWT_SECRET
+```
+
+Also replace `POSTGRES_PASSWORD` with a strong password of your own.
+
 ## 🚀 Quick Start
 
 ```bash
@@ -37,7 +47,7 @@ cd n8n-qdrant-starter
 # 2. Run setup (creates .env with secure keys + required directories)
 ./scripts/setup.sh
 
-# 3. Edit .env and set a secure PostgreSQL password
+# 3. Edit .env and verify all values are set (encryption key, JWT secret, DB password)
 nano .env
 
 # 4. Start the stack
