@@ -62,7 +62,6 @@ Access n8n at **[http://localhost:5678](http://localhost:5678)** and Qdrant at *
 | `postgres` | `postgres:16-alpine` | `5432` (internal) | n8n metadata & workflow storage |
 | `n8n` | `n8nio/n8n:latest` | `5678` | Workflow automation engine |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | Vector database for AI embeddings |
-| `n8n-import` | `alpine:latest` | — | One-shot demo data import (runs once) |
 
 ## 🔗 Using Qdrant in n8n
 
