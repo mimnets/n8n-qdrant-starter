@@ -32,7 +32,7 @@ Perfect for: OCI free tier, budget VPS, homelab servers, and offline-capable set
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/n8n-qdrant-starter.git
+git clone https://github.com/mimnets/n8n-qdrant-starter.git
 cd n8n-qdrant-starter
 
 # 2. Run setup (creates .env with secure keys + required directories)
