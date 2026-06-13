@@ -1,7 +1,7 @@
 x-common: &common
   restart: unless-stopped
   networks:
-    - demo
+    - ai-starter
 
 x-postgres-env: &postgres-env
   POSTGRES_USER: ${POSTGRES_USER:-n8n}
@@ -32,30 +32,6 @@ services:
     volumes:
       - qdrant_storage:/qdrant/storage
 
-  n8n-import:
-    image: alpine:latest
-    container_name: n8n-import
-    volumes:
-      - n8n_storage:/data/n8n
-      - shared:/data/shared
-      - ./n8n/demo-data:/data/demo-data:ro
-    entrypoint:
-      - sh
-      - -c
-    command:
-      - |
-        if [ -f /data/n8n/config ]; then
-          echo "n8n already initialized, skipping import"
-        else
-          echo "First run, importing demo data..."
-          mkdir -p /data/shared/demo
-          cp -r /data/demo-data/* /data/shared/demo/ 2>/dev/null || echo "No demo data to import"
-          touch /data/n8n/config
-          echo "Demo data import complete"
-        fi
-    networks:
-      - demo
-
   n8n:
     <<: *common
     image: n8nio/n8n:latest
@@ -73,13 +49,9 @@ services:
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-n8n}
     volumes:
       - n8n_storage:/home/node/.n8n
-      - shared:/data/shared
-      - ./n8n/demo-data:/data/demo-data:ro
     depends_on:
       postgres:
         condition: service_healthy
-      n8n-import:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://localhost:5678/healthz || exit 1"]
       interval: 15s
@@ -87,11 +59,10 @@ services:
       retries: 5
 
 networks:
-  demo:
+  ai-starter:
     driver: bridge
 
 volumes:
   postgres_storage:
   n8n_storage:
   qdrant_storage:
-  shared:
