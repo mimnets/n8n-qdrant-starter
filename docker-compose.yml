@@ -31,11 +31,6 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_storage:/qdrant/storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   n8n-import:
     image: alpine:latest
@@ -82,8 +77,6 @@ services:
       - ./n8n/demo-data:/data/demo-data:ro
     depends_on:
       postgres:
-        condition: service_healthy
-      qdrant:
         condition: service_healthy
       n8n-import:
         condition: service_completed_successfully

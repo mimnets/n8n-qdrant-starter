@@ -1,16 +1,15 @@
 # n8n + Qdrant AI Stack 🚀
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![CPU Friendly](https://img.shields.io/badge/CPU-Only-green)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Production-ready AI automation stack with n8n and Qdrant vector database — runs on CPU only.
+> Production-ready AI automation stack with n8n and Qdrant vector database.
 
 ## 📖 Overview
 
-A lightweight, self-hosted AI automation stack combining **[n8n](https://n8n.io)** workflow automation with **[Qdrant](https://qdrant.tech)** vector database. Designed for CPU-only servers — no GPU required. Use external AI providers (OpenAI, Anthropic, Cohere) for AI capabilities.
+A lightweight, self-hosted AI automation stack combining **[n8n](https://n8n.io)** workflow automation with **[Qdrant](https://qdrant.tech)** vector database. Use external AI providers (OpenAI, Anthropic, Cohere) for AI capabilities.
 
-Perfect for: OCI free tier, budget VPS, homelab servers, and offline-capable setups.
+Perfect for: OCI free tier, budget VPS, and homelab servers.
 
 ## 🏗️ Architecture
 
@@ -54,9 +53,7 @@ Access n8n at **[http://localhost:5678](http://localhost:5678)** and Qdrant at *
 | Docker | 20.10+ |
 | Docker Compose | v2+ |
 | RAM | 4 GB |
-| CPU | Any x86_64 / ARM64 |
 | Disk | 10 GB free |
-| GPU | **Not required** |
 
 ## 🗄️ Services
 
@@ -138,7 +135,6 @@ Backups are stored in `./backups/` (gitignored).
 | **Port 5678 already in use** | Change port mapping in `docker-compose.yml`: `"5679:5678"` |
 | **n8n won't start** | Check logs: `docker compose logs n8n` |
 | **Database connection refused** | Ensure PostgreSQL is healthy: `docker compose ps postgres` |
-| **Qdrant healthcheck fails** | Check Qdrant logs: `docker compose logs qdrant` |
 | **Permission denied on scripts** | Run `chmod +x scripts/*.sh` |
 | **Demo data not imported** | Remove volume and restart: `docker compose down -v && docker compose up -d` |
 
@@ -165,4 +161,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built for CPU-only servers.** No GPU required. No Ollama. No local LLMs. Just n8n + Qdrant + your cloud AI provider of choice.
+**Just n8n + Qdrant + your cloud AI provider of choice.**
