@@ -135,6 +135,7 @@ Backups are stored in `./backups/` (gitignored).
 | **n8n won't start** | Check logs: `docker compose logs n8n` |
 | **Database connection refused** | Ensure PostgreSQL is healthy: `docker compose ps postgres` |
 | **Permission denied on scripts** | Run `chmod +x scripts/*.sh` |
+| **password authentication failed for user "n8n"** | Stale Postgres volume with an old password. Wipe and restart: `docker compose down -v && docker compose up -d` |
 | **Demo data not imported** | Remove volume and restart: `docker compose down -v && docker compose up -d` |
 
 ## 📁 Project Structure
