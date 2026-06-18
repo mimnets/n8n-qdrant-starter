@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from browser_use import Agent, Browser, BrowserConfig
+from browser_use import Agent, Browser, BrowserProfile
 from browser_use.agent.views import AgentHistoryList
 
 from .llm_factory import get_llm
@@ -67,7 +67,7 @@ class TaskManager:
             "error": None,
             "steps": [],
             "agent": None,
-            "browser": None,
+            "browser_session": None,
             "save_browser_data": save_browser_data,
             "browser_data": None,
             "max_steps": max_steps,
@@ -88,7 +88,7 @@ class TaskManager:
         t = _tasks.get(task_id)
         if t is None:
             return None
-        return {k: v for k, v in t.items() if k not in ("agent", "browser")}
+        return {k: v for k, v in t.items() if k not in ("agent", "browser_session")}
 
     @staticmethod
     def status(task_id: str) -> Optional[dict[str, Any]]:
@@ -196,38 +196,49 @@ async def _execute(
     save_browser_data: bool,
 ) -> None:
     """Background coroutine that creates the Agent, runs it, and records results."""
-    browser = None
+    browser_session = None
     try:
         _tasks[task_id]["status"] = "running"
         llm = get_llm(ai_provider)
 
         # -- Browser setup ------------------------------------------------
-        browser_config_kwargs: dict[str, Any] = {
-            "headless": not headful,
-        }
         chrome_path = os.getenv("CHROME_PATH")
         chrome_user_data = os.getenv("CHROME_USER_DATA")
 
+        # Build BrowserProfile kwargs
+        profile_kwargs: dict[str, Any] = {
+            "headless": not headful,
+        }
+
+        # Docker needs chromium_sandbox=False
+        if os.getenv("IN_DOCKER", "").lower() == "true" or os.path.exists("/.dockerenv"):
+            profile_kwargs["chromium_sandbox"] = False
+            logger.info("Task %s: Docker detected — disabling Chromium sandbox", task_id)
+
         if use_custom_chrome is not False and chrome_path:
-            browser_config_kwargs["chrome_instance_path"] = chrome_path
+            profile_kwargs["executable_path"] = chrome_path
             logger.info("Task %s: Using custom Chrome at %s", task_id, chrome_path)
 
         if use_custom_chrome is not False and chrome_user_data:
-            browser_config_kwargs["user_data_dir"] = chrome_user_data
-            logger.info(
-                "Task %s: Using Chrome user data dir %s",
-                task_id, chrome_user_data,
-            )
+            profile_kwargs["user_data_dir"] = chrome_user_data
+            logger.info("Task %s: Using Chrome user data dir %s",
+                        task_id, chrome_user_data)
 
-        browser_config = BrowserConfig(**browser_config_kwargs)
-        browser = Browser(config=browser_config)
-        _tasks[task_id]["browser"] = browser
+        browser_profile = BrowserProfile(**profile_kwargs)
+
+        # BrowserSession (Browser is an alias for BrowserSession)
+        browser_session = Browser(browser_profile=browser_profile)
+        _tasks[task_id]["browser_session"] = browser_session
+
+        # Start the browser
+        await browser_session.start()
+        logger.info("Task %s: Browser session started", task_id)
 
         # -- Agent setup --------------------------------------------------
         agent = Agent(
             task=instruction,
             llm=llm,
-            browser=browser,
+            browser_session=browser_session,
         )
         _tasks[task_id]["agent"] = agent
 
@@ -242,7 +253,7 @@ async def _execute(
 
         # Log summary
         logger.info(
-            "Task %s finished — %.1fs  |  steps: %d  |  tokens IN: %d  OUT: %d",
+            "Task %s finished — %.1fs | steps: %d | tokens IN: %d OUT: %d",
             task_id,
             result.total_duration_seconds(),
             result.number_of_steps(),
@@ -257,14 +268,12 @@ async def _execute(
         _tasks[task_id]["finished_at"] = _utcnow()
 
     finally:
-        if browser is not None:
+        if browser_session is not None:
             try:
-                await browser.close()
-                logger.debug("Browser closed for task %s", task_id)
+                await browser_session.stop()
+                logger.debug("Browser session stopped for task %s", task_id)
             except Exception as exc:
-                logger.error(
-                    "Error closing browser for task %s: %s", task_id, exc
-                )
+                logger.error("Error stopping browser for task %s: %s", task_id, exc)
 
 
 # ---------------------------------------------------------------------------
