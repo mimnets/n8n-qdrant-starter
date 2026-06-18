@@ -57,6 +57,36 @@ MIME_MAP = {
     "tif": "image/tiff",
 }
 
+# Magic-byte signatures for image type detection.
+# Used when the filename extension is missing or garbage (e.g. n8n derives a
+# filename from an API endpoint like "FLUX.1-schnell").
+SIGNATURES: list[tuple[bytes, str]] = [
+    (b"\x89PNG\r\n\x1a\n", "png"),
+    (b"\xff\xd8\xff", "jpg"),
+    (b"GIF8", "gif"),
+    (b"RIFF", "webp"),  # RIFF....WEBP — checked in detect_extension
+    (b"BM", "bmp"),
+    (b"\x00\x00\x01\x00", "ico"),
+    (b"II*\x00", "tiff"),
+    (b"MM\x00*", "tiff"),
+    (b"<?xml", "svg"),
+    (b"<svg", "svg"),
+    (b"<SVG", "svg"),
+]
+
+
+def detect_extension(content: bytes) -> str | None:
+    """Detect image file extension from magic bytes. Returns None if unknown."""
+    if len(content) < 12:
+        return None
+    for magic, ext in SIGNATURES:
+        if content.startswith(magic):
+            # RIFF container: verify it's WEBP (RIFF....WEBP)
+            if ext == "webp" and content[8:12] != b"WEBP":
+                continue
+            return ext
+    return None
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
@@ -127,26 +157,37 @@ async def upload_image(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
-    # Validate extension
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
-
-    # Generate a unique, sortable filename: YYYYMMDD_HHMMSS_uuid.ext
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    unique_name = f"{timestamp}_{uuid.uuid4().hex[:8]}.{ext}"
-    file_path = UPLOAD_DIR / unique_name
-
-    # Read and validate size
+    # Read content first — we need it for both size check and type detection
     content = await file.read()
+
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Empty file")
+
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=413,
             detail=f"File too large ({len(content)} bytes). Max allowed: {MAX_FILE_SIZE_MB} MB",
         )
+
+    # Determine extension.
+    # Try the filename extension first, but when it's garbage (e.g. n8n derives
+    # the filename from an HF API endpoint like "FLUX.1-schnell"), fall back to
+    # magic-byte detection on the actual binary content.
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        detected = detect_extension(content)
+        if detected:
+            ext = detected
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            )
+
+    # Generate a unique, sortable filename: YYYYMMDD_HHMMSS_uuid.ext
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    unique_name = f"{timestamp}_{uuid.uuid4().hex[:8]}.{ext}"
+    file_path = UPLOAD_DIR / unique_name
 
     # Write to disk
     file_path.write_bytes(content)
