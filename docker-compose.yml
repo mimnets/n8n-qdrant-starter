@@ -161,6 +161,7 @@ services:
       - VNC_PASSWORD=${VNC_PASSWORD:-vncpassword}
       - ANONYMIZED_TELEMETRY=false
       - KEEP_BROWSER_OPEN=true
+      - DISPLAY=:99
     volumes:
       - browser_webui_data:/app/data
     shm_size: '2gb'

@@ -1,81 +1,133 @@
-# n8n + Qdrant AI Stack 🚀
+# n8n + Qdrant + Browser Automation Stack 🚀
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Production-ready AI automation stack with n8n and Qdrant vector database.
+> Production-ready AI automation stack with n8n, Qdrant vector database, and
+> AI-powered browser automation — all self-hosted.
 
 ## 📖 Overview
 
-A lightweight, self-hosted AI automation stack combining **[n8n](https://n8n.io)** workflow automation with **[Qdrant](https://qdrant.tech)** vector database. Use external AI providers (OpenAI, Anthropic, Cohere) for AI capabilities.
+A lightweight, self-hosted stack combining:
 
-Perfect for: OCI free tier, budget VPS, and homelab servers.
+- **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
+- **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
+- **[Browser Use](https://github.com/browser-use/browser-use)** — AI agent that controls a real web browser
+- **[Browser Use WebUI](https://github.com/browser-use/web-ui)** — human-facing Gradio interface with live noVNC view
+
+Perfect for OCI free tier, budget VPS, and homelab servers.
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│             │     │              │     │             │
-│  PostgreSQL │◄────│     n8n      │────►│   Qdrant    │
-│  (metadata) │     │ (automation) │     │  (vectors)  │
-│             │     │              │     │             │
-└─────────────┘     └──────────────┘     └─────────────┘
-      :5432               :5678               :6333
+┌──────────────┐     ┌──────────────┐     ┌─────────────┐
+│  PostgreSQL  │◄────│     n8n      │────►│   Qdrant    │
+│  (metadata)  │     │ (automation) │     │  (vectors)  │
+└──────────────┘     └──────┬───────┘     └─────────────┘
+      :5432                 │                   :6333
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+    ┌─────────┴─────────┐     ┌──────────┴──────────┐
+    │   Browser API     │     │   Browser WebUI     │
+    │   (REST bridge)   │     │   (Gradio + noVNC)  │
+    │   :8001 (host)    │     │   :7788 / :6080     │
+    └───────────────────┘     └─────────────────────┘
 ```
 
-- **PostgreSQL 16** — n8n workflow metadata, credentials, execution history
-- **n8n** — workflow automation engine with 400+ integrations
-- **Qdrant** — vector database for semantic search, RAG, and AI memory
+- **browser-api** — REST API that n8n calls via HTTP Request nodes to run browser
+  automation tasks. Built directly on the `browser-use` Agent library.
+- **browser-webui** — Human-facing Gradio UI for manually running browser tasks,
+  with noVNC live browser view at port `:6080`.
 
 ## ⚠️ Important
 
-**The default `.env` values are placeholders.** If you don't replace them before starting the stack, n8n will fail to run — the encryption key and JWT secret must be properly generated 64-character hex strings. Run `./scripts/setup.sh` to generate secure values automatically, or manually generate them:
+**The default `.env` values are placeholders.** Run `./scripts/setup.sh` to
+generate secure values, then edit `.env` and set at least one LLM API key:
 
 ```bash
-openssl rand -hex 32  # for N8N_ENCRYPTION_KEY and N8N_USER_MANAGEMENT_JWT_SECRET
+DEEPSEEK_API_KEY=sk-your-deepseek-key    # recommended — best price/performance
+# or
+OPENAI_API_KEY=sk-your-openai-key
+# or
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
 ```
-
-Also replace `POSTGRES_PASSWORD` with a strong password of your own.
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Clone the repository
+# 1. Clone
 git clone https://github.com/mimnets/n8n-qdrant-starter.git
 cd n8n-qdrant-starter
 
-# 2. Run setup (creates .env with secure keys + required directories)
+# 2. Setup (generates .env with secure keys)
 ./scripts/setup.sh
 
-# 3. Edit .env and verify all values are set (encryption key, JWT secret, DB password)
+# 3. Edit .env — add your LLM API key + change passwords
 nano .env
 
-# 4. Start the stack
+# 4. Start
 docker compose up -d
+
+# 5. Build and start the browser services
+docker compose up -d --build browser-api browser-webui
 ```
-
-Access n8n at **[http://localhost:5678](http://localhost:5678)** and Qdrant at **[http://localhost:6333](http://localhost:6333)**.
-
-## 📋 Requirements
-
-| Requirement | Minimum |
-|------------|---------|
-| Docker | 20.10+ |
-| Docker Compose | v2+ |
-| RAM | 4 GB |
-| Disk | 10 GB free |
 
 ## 🗄️ Services
 
-| Service | Image | Port | Description |
-|---------|-------|------|-------------|
-| `postgres` | `postgres:16-alpine` | `5432` (internal) | n8n metadata & workflow storage |
+| Service | Image / Build | Port (host) | Description |
+|---------|---------------|-------------|-------------|
+| `postgres` | `postgres:16-alpine` | `5432` *(internal)* | n8n metadata & workflow storage |
 | `n8n` | `n8nio/n8n:latest` | `5678` | Workflow automation engine |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | Vector database for AI embeddings |
+| `browser-api` | *built from `./browser_api`* | `8001` | REST bridge for n8n ↔ browser automation |
+| `browser-webui` | *built from official repo* | `7788` | Gradio UI for manual browser tasks |
+| | | `6080` | noVNC — live browser view |
+| | | `5901` | VNC — direct connection |
+| | | `9222` | Chrome DevTools Protocol |
+
+## 🤖 Browser Automation
+
+### From n8n workflows
+
+Use the **HTTP Request node** to call `http://browser-api:8000/api/v1/run-task`:
+
+```json
+POST http://browser-api:8000/api/v1/run-task
+Content-Type: application/json
+
+{
+  "task": "Go to news.ycombinator.com and return the top 5 headlines",
+  "ai_provider": "deepseek",
+  "max_steps": 50
+}
+```
+
+Poll `/api/v1/task/{id}/status` until `status: "finished"`, then read the `result`.
+
+Full API docs: `http://your-server:8001/docs`
+
+### From the WebUI
+
+Open `http://your-server:7788` — a chat-like interface where you type
+instructions and watch the browser execute them live at
+`http://your-server:6080/vnc.html` (password from `VNC_PASSWORD` in `.env`).
+
+### Supported LLM providers
+
+| Provider | `.env` key | `ai_provider` value |
+|----------|-----------|---------------------|
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek` |
+| OpenAI | `OPENAI_API_KEY` | `openai` |
+| Anthropic | `ANTHROPIC_API_KEY` | `anthropic` |
+| Google Gemini | `GOOGLE_API_KEY` | `google` |
+| Mistral | `MISTRAL_API_KEY` | `mistral` |
+| Ollama (local) | *(no key needed)* | `ollama` |
+| Azure OpenAI | `AZURE_OPENAI_API_KEY` | `azure` |
 
 ## 🔗 Using Qdrant in n8n
 
-Qdrant is on the internal `demo` network. From n8n workflows, connect via:
+Qdrant is on the internal `ai-starter` network. From n8n workflows:
 
 ```
 Host: qdrant
@@ -83,43 +135,16 @@ Port: 6333
 URL: http://qdrant:6333
 ```
 
-**HTTP Request node example:**
-```
-GET http://qdrant:6333/collections
-```
-
-For the full Qdrant API, see the [Qdrant REST docs](https://qdrant.tech/documentation/interfaces/#rest).
-
-For advanced Qdrant operations (create collections, upsert vectors, search), use the **HTTP Request node** in n8n with the Qdrant REST API.
-
-## 🤖 Adding AI Capabilities
-
-Use cloud AI providers via n8n's built-in AI nodes or HTTP Request nodes:
-
-### OpenAI
-Set `OPENAI_API_KEY` in `.env`, then use the **OpenAI** node in n8n for embeddings, chat completions, and image generation.
-
-### Anthropic (Claude)
-Set `ANTHROPIC_API_KEY` in `.env`, use the **Anthropic** node or HTTP Request node:
-
-```json
-POST https://api.anthropic.com/v1/messages
-Headers: x-api-key: YOUR_KEY, anthropic-version: 2023-06-01
-```
-
-### Cohere
-Set `COHERE_API_KEY` in `.env`, use the **Cohere** node for embeddings and text generation.
-
 ### RAG Flow Example
-1. **HTTP Request node** → Send text to OpenAI/Cohere embeddings API
-2. **HTTP Request node** → Store vectors in Qdrant (`PUT /collections/my-collection/points`)
-3. **HTTP Request node** → Search Qdrant (`POST /collections/my-collection/points/search`)
-4. **AI node** → Send context + query to Claude/GPT for final answer
+
+1. **HTTP Request node** → send text to embedding API
+2. **HTTP Request node** → store vectors in Qdrant (`PUT /collections/my-collection/points`)
+3. **HTTP Request node** → search Qdrant (`POST /collections/my-collection/points/search`)
+4. **AI node** → send context + query to LLM for final answer
 
 ## 💾 Backup & Restore
 
 ```bash
-# Create a full backup (PostgreSQL + n8n + Qdrant)
 ./scripts/backup.sh
 
 # Manual restore
@@ -127,48 +152,62 @@ tar -xzf backups/backup_TIMESTAMP/n8n_data.tar.gz
 docker compose exec -T postgres psql -U n8n n8n < backups/backup_TIMESTAMP/postgres_dump.sql
 ```
 
-Backups are stored in `./backups/` (gitignored).
-
 ## 🔒 Security Notes
 
 - **Change all default passwords** in `.env` before production use
-- Set strong `N8N_ENCRYPTION_KEY` and `N8N_USER_MANAGEMENT_JWT_SECRET` (setup script generates these automatically)
-- n8n is exposed on `0.0.0.0:5678` — use a reverse proxy (nginx, Caddy) with HTTPS for production
-- Qdrant has no built-in auth — keep it on the internal Docker network or use a reverse proxy with auth
-- Never commit `.env` to version control (it's in `.gitignore`)
+- Set strong `N8N_ENCRYPTION_KEY` and `N8N_USER_MANAGEMENT_JWT_SECRET`
+- n8n is exposed on `0.0.0.0:5678` — use a reverse proxy (nginx, Caddy) with HTTPS
+- Qdrant has no built-in auth — keep on internal Docker network
+- Never commit `.env` (it's gitignored)
 
 ## 🔧 Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| **Port 5678 already in use** | Change port mapping in `docker-compose.yml`: `"5679:5678"` |
+| **Port already in use** | Change port mapping in `docker-compose.yml` |
 | **n8n won't start** | Check logs: `docker compose logs n8n` |
-| **Database connection refused** | Ensure PostgreSQL is healthy: `docker compose ps postgres` |
-| **Permission denied on scripts** | Run `chmod +x scripts/*.sh` |
-| **password authentication failed for user "n8n"** | Stale Postgres volume with an old password. Wipe and restart: `docker compose down -v && docker compose up -d` |
-| **Demo data not imported** | Remove volume and restart: `docker compose down -v && docker compose up -d` |
+| **Browser API build fails** | Ensure `browser_api/` directory exists, check `docker compose logs browser-api` |
+| **browser-webui pull denied** | Builds from GitHub source — no registry auth needed |
+| **noVNC can't connect** | Wait ~30s for VNC server to start; check password |
+| **Browser task hangs** | Try `"max_steps": 30` — complex pages may need more steps |
 
 ## 📁 Project Structure
 
 ```
 n8n-qdrant-starter/
-├── .env.example          # Environment template
-├── .gitignore            # Git ignore rules
-├── docker-compose.yml    # Service orchestration
-├── README.md             # This file
-├── LICENSE               # MIT License
+├── .env.example              # Environment template
+├── .gitignore
+├── docker-compose.yml        # All services
+├── README.md
+├── LICENSE                   # MIT
 ├── scripts/
-│   ├── setup.sh          # First-run setup wizard
-│   └── backup.sh         # Backup all services
+│   ├── setup.sh              # First-run setup
+│   ├── n8n-entrypoint.sh     # n8n container entrypoint
+│   └── backup.sh             # Backup all services
+├── browser_api/              # Our REST bridge for browser automation
+│   ├── app.py                # FastAPI application
+│   ├── agent_service.py      # browser-use Agent wrapper
+│   ├── llm_factory.py        # Multi-provider LLM factory
+│   ├── Dockerfile
+│   └── requirements.txt
 └── n8n/
-    └── demo-data/        # Drop demo workflow JSON files here
-        └── .gitkeep
+    └── demo-data/            # Drop demo workflow JSON files here
 ```
+
+## 🙏 Credits
+
+The browser automation components in this stack are inspired by and built upon
+the excellent work of the **[Browser Use](https://github.com/browser-use)** project:
+
+- **[browser-use](https://github.com/browser-use/browser-use)** — the core Python
+  library that gives AI agents the ability to control a real web browser via
+  Playwright. Licensed under MIT.
+
+- **[browser-use/web-ui](https://github.com/browser-use/web-ui)** — the official
+  Gradio-based WebUI with noVNC live browser view. Our `browser_api/` REST bridge
+  follows the same Agent integration patterns and uses the same underlying
+  `browser_use.Agent` API. Licensed under MIT.
 
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE) for details.
-
----
-
-**Just n8n + Qdrant + your cloud AI provider of choice.**
