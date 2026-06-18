@@ -87,7 +87,7 @@ docker compose up -d --build browser-api browser-webui
 | `postgres` | `postgres:16-alpine` | `5432` *(internal)* | n8n metadata & workflow storage |
 | `n8n` | `n8nio/n8n:latest` | `5678` | Workflow automation engine |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | Vector database for AI embeddings |
-| `browser-api` | *built from `./browser_api`* | `8001` | REST bridge for n8n ↔ browser automation |
+| `browser-api` | *built from `./browser_api`* | `7999` | Persistent browser API for n8n (port 8001 used by Portainer) |
 | `browser-webui` | *built from official repo* | `7788` | Gradio UI for manual browser tasks |
 | | | `6080` | noVNC — live browser view |
 | | | `5901` | VNC — direct connection |
@@ -97,24 +97,50 @@ docker compose up -d --build browser-api browser-webui
 
 ### From n8n workflows
 
-Use the **HTTP Request node** to call `http://browser-api:8000/api/v1/run-task`:
+Use the **HTTP Request node** — one call, returns result directly (blocking):
 
-```json
-POST http://browser-api:8000/api/v1/run-task
+```
+POST http://browser-api:8000/api/run
 Content-Type: application/json
 
 {
   "task": "Go to news.ycombinator.com and return the top 5 headlines",
+  "llm_provider": "deepseek",
   "max_steps": 50
 }
 ```
 
-`ai_provider` is optional — it defaults to `DEFAULT_AI_PROVIDER` from `.env`
-(falls back to `openai`).  Override per-call with `"ai_provider": "deepseek"`.
+Response:
+```json
+{
+  "success": true,
+  "result": "1. Article A\n2. Article B...",
+  "error": null,
+  "steps_taken": 5
+}
+```
 
-Poll `/api/v1/task/{id}/status` until `status: "finished"`, then read the `result`.
+#### With logins (sensitive data)
 
-Full API docs: `http://your-server:8001/docs`
+```json
+{
+  "task": "Log in with {{email}} and {{password}}, then check notifications",
+  "sensitive_data": {"email": "you@example.com", "password": "s3cret"}
+}
+```
+
+#### Other endpoints
+
+| Endpoint | Use |
+|----------|-----|
+| `GET /health` | Health check |
+| `GET /api/providers` | Check which LLMs are configured |
+| `POST /api/browser/reset` | Clear cookies + fresh browser session |
+
+#### Cookie persistence
+
+Cookies are saved to `./browser_profile/cookies.json` after each task and
+survive container restarts. Login once, stay logged in.
 
 ### From the WebUI
 
@@ -193,12 +219,11 @@ n8n-qdrant-starter/
 │   ├── setup.sh              # First-run setup
 │   ├── n8n-entrypoint.sh     # n8n container entrypoint
 │   └── backup.sh             # Backup all services
-├── browser_api/              # Our REST bridge for browser automation
-│   ├── app.py                # FastAPI application
-│   ├── agent_service.py      # browser-use Agent wrapper
-│   ├── llm_factory.py        # Multi-provider LLM factory
+├── browser_api/              # Persistent browser REST API
+│   ├── server.py             # Single-file FastAPI app
 │   ├── Dockerfile
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── browser_profile/      # Cookie persistence (auto-saved)
 └── n8n/
     └── demo-data/            # Drop demo workflow JSON files here
 ```

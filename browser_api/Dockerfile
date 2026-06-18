@@ -1,27 +1,24 @@
 # =============================================================================
-# browser-api Docker image
-#
-# Based on patterns from the official browser-use/web-ui Dockerfile:
-# https://github.com/browser-use/web-ui
+# browser-api Docker image — single-file server.py wrapping browser-use Agent.
+# Based on browser-use-fastapi-docker-server by gauravdhiman:
+# https://github.com/gauravdhiman/browser-use-fastapi-docker-server
 # =============================================================================
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Playwright needs to know where browsers live — use a shared path so both
-# root (during install) and appuser (at runtime) can access them.
+# Shared path so Playwright browsers are accessible by all users
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 
 # ---------------------------------------------------------------------------
-# System dependencies (Playwright + healthcheck)
+# System dependencies
 # ---------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     gnupg \
     ca-certificates \
-    # Playwright browser runtime deps
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -45,22 +42,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ---------------------------------------------------------------------------
-# Playwright browsers — install to shared location as root, then make
-# readable by everyone so appuser can use them.
+# Playwright Chromium — install to shared location
 # ---------------------------------------------------------------------------
 RUN mkdir -p /opt/playwright-browsers && chmod 777 /opt/playwright-browsers
 RUN playwright install chromium
 RUN playwright install-deps chromium
 
 # ---------------------------------------------------------------------------
-# Application code — copy into a subdirectory so the Python package works
+# Application
 # ---------------------------------------------------------------------------
-COPY . /app/browser_api/
-RUN mkdir -p /app/data && chmod 777 /app/data
+COPY server.py /app/
+RUN mkdir -p /app/browser_profile && chmod 777 /app/browser_profile
 
-# ---------------------------------------------------------------------------
 # Drop privileges
-# ---------------------------------------------------------------------------
 RUN adduser --disabled-password --gecos "" appuser \
     && chown -R appuser:appuser /app
 USER appuser
@@ -68,6 +62,6 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/ping || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["python", "-m", "browser_api.app"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

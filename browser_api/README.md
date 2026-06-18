@@ -1,48 +1,52 @@
-# browser-api — REST Bridge for n8n ↔ Browser Use
+# browser-api — Persistent Browser REST API for n8n
 
-Self-contained REST API that wraps the official [`browser-use`](https://github.com/browser-use/browser-use) Agent library, designed to be called from n8n HTTP Request nodes.
+Single-file FastAPI server wrapping `browser-use==0.1.48` with a persistent browser
+and cookie persistence — login sessions survive between calls and across restarts.
 
-## Inspiration
-
-The architecture and Agent integration patterns are based on the official
-[**browser-use/web-ui**](https://github.com/browser-use/web-ui) project — we use the same underlying
-`browser_use.Agent` and `browser_use.Browser` APIs, exposed through a programmatic
-FastAPI REST interface instead of a Gradio frontend.
+Design based on [browser-use-fastapi-docker-server](https://github.com/gauravdhiman/browser-use-fastapi-docker-server).
 
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/ping` | Health check |
-| `POST` | `/api/v1/run-task` | Start a browser task |
-| `GET` | `/api/v1/task/{id}` | Full task details |
-| `GET` | `/api/v1/task/{id}/status` | Status + result |
-| `PUT` | `/api/v1/stop-task/{id}` | Stop a task |
-| `PUT` | `/api/v1/pause-task/{id}` | Pause a task |
-| `PUT` | `/api/v1/resume-task/{id}` | Resume a task |
-| `GET` | `/api/v1/list-tasks` | List all tasks |
-| `GET` | `/api/v1/browser-config` | Current browser config |
-| `GET` | `/live/{id}` | Embeddable live view (HTML) |
+| `GET` | `/health` | Health check → `{"status":"ok"}` |
+| `POST` | `/api/run` | Run a browser task (blocks, returns result) |
+| `POST` | `/api/browser/reset` | Reset browser + clear cookies |
+| `GET` | `/api/providers` | List configured LLM providers |
 
-## Usage from n8n
+## POST /api/run
 
-```
-POST http://browser-api:8000/api/v1/run-task
-Content-Type: application/json
-
+```json
 {
-  "task": "Go to example.com and extract the page title",
-  "ai_provider": "openai",
-  "max_steps": 50
+  "task": "Go to linkedin.com and check notifications",
+  "llm_provider": "deepseek",
+  "model_name": null,
+  "max_steps": 30,
+  "use_vision": false,
+  "sensitive_data": {"email": "you@example.com", "password": "s3cret"}
 }
 ```
 
-## Supported LLM Providers
+Response:
+```json
+{
+  "success": true,
+  "result": "You have 3 new notifications...",
+  "error": null,
+  "steps_taken": 12
+}
+```
 
-`openai`, `deepseek`, `anthropic`, `google`, `mistral`, `ollama`, `azure`
+Use `{{variable}}` syntax in task strings — e.g. `"Log in with {{email}} and {{password}}"`.
 
-Configured via environment variables in the parent `.env` file.
+## Cookie persistence
 
-## License
+- Cookies saved to `./browser_profile/cookies.json` after each task
+- Automatically reloaded on container restart
+- `POST /api/browser/reset` clears cookies + starts fresh browser
 
-MIT — same as the browser-use/web-ui project that inspired this design.
+## LLM Providers
+
+Set in `.env`: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.
+
+Check `/api/providers` to see which are configured.

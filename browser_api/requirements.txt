@@ -1,20 +1,14 @@
-# =============================================================================
-# browser-api — REST bridge for n8n ↔ browser-use Agent
-# =============================================================================
-
-# --- Browser automation core ------------------------------------------------
-browser-use>=0.1.40
-playwright>=1.40.0
-
-# --- Web framework -----------------------------------------------------------
-fastapi>=0.100.0
-uvicorn[standard]>=0.22.0
-pydantic>=2.0.0
-python-dotenv>=1.0.0
-
-# --- LLM providers (direct imports in llm_factory.py) -----------------------
-langchain-openai>=0.2.0
-langchain-anthropic>=0.3.0
-langchain-google-genai>=0.0.3
-langchain-mistralai>=0.2.0
-langchain-ollama>=0.2.0
+browser-use==0.1.48
+langchain-openai==0.3.11
+langchain-anthropic==0.3.3
+langchain-core==0.3.49
+openai==1.109.1
+pydantic==2.10.6
+fastapi
+uvicorn
+python-multipart
+langchain-google-genai
+langchain-mistralai
+langchain-ollama
+playwright
+python-dotenv
