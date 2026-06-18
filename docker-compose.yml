@@ -64,6 +64,105 @@ services:
       timeout: 10s
       retries: 5
 
+  # =========================================================================
+  # Browser Use API Bridge — REST API that n8n calls via HTTP Request nodes.
+  # Docs: https://github.com/hoangnb24/browser-n8n-local
+  # =========================================================================
+  browser-api:
+    <<: *common
+    build:
+      context: ./browser-n8n-local
+      dockerfile: Dockerfile
+    container_name: browser-n8n-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      # OpenAI (also used for DeepSeek via OPENAI_BASE_URL override)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      # Anthropic
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL_ID=${ANTHROPIC_MODEL_ID:-claude-sonnet-4-6}
+      # Mistral
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - MISTRAL_MODEL_ID=${MISTRAL_MODEL_ID:-mistral-large-latest}
+      # Google Gemini
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_MODEL_ID=${GOOGLE_MODEL_ID:-gemini-2.0-flash}
+      # Ollama (local LLM)
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://localhost:11434}
+      - OLLAMA_MODEL_ID=${OLLAMA_MODEL_ID:-llama3}
+      # Azure OpenAI
+      - AZURE_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+      - AZURE_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-01-01-preview}
+      # Browser settings
+      - BROWSER_USE_HEADFUL=false
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - browser_tasks:/app/data
+    shm_size: '2gb'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =========================================================================
+  # Browser Use WebUI — Gradio interface for manual browser automation.
+  # Includes noVNC at :6080 to watch the browser live.
+  # Docs: https://github.com/browser-use/web-ui
+  # =========================================================================
+  browser-webui:
+    <<: *common
+    image: ghcr.io/browser-use/web-ui:main
+    container_name: browser-webui
+    ports:
+      - "7788:7788"    # Gradio WebUI
+      - "6080:6080"    # noVNC (browser live view — password from VNC_PASSWORD)
+      - "5901:5901"    # VNC (direct connection)
+      - "9222:9222"    # Chrome DevTools Protocol
+    environment:
+      # LLM Providers
+      - OPENAI_ENDPOINT=${OPENAI_ENDPOINT:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_ENDPOINT=${ANTHROPIC_ENDPOINT:-https://api.anthropic.com}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-01-01-preview}
+      - DEEPSEEK_ENDPOINT=${DEEPSEEK_ENDPOINT:-https://api.deepseek.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://localhost:11434}
+      - MISTRAL_ENDPOINT=${MISTRAL_ENDPOINT:-https://api.mistral.ai/v1}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      # Browser Settings
+      - BROWSER_USE_LOGGING_LEVEL=${LOG_LEVEL:-info}
+      - RESOLUTION=${BROWSER_RESOLUTION:-1920x1080x24}
+      - RESOLUTION_WIDTH=${BROWSER_RESOLUTION_WIDTH:-1920}
+      - RESOLUTION_HEIGHT=${BROWSER_RESOLUTION_HEIGHT:-1080}
+      - VNC_PASSWORD=${VNC_PASSWORD:-vncpassword}
+      - ANONYMIZED_TELEMETRY=false
+      - KEEP_BROWSER_OPEN=true
+    volumes:
+      - browser_webui_data:/app/data
+    shm_size: '2gb'
+    cap_add:
+      - SYS_ADMIN
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 5901 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 networks:
   ai-starter:
     driver: bridge
@@ -72,3 +171,5 @@ volumes:
   postgres_storage:
   n8n_storage:
   qdrant_storage:
+  browser_tasks:
+  browser_webui_data:

@@ -33,6 +33,15 @@ else
     echo "✅ .env file already exists"
 fi
 
+# Clone browser-n8n-local bridge if not already present
+if [ ! -d "browser-n8n-local" ]; then
+    echo "📥 Cloning browser-n8n-local (API bridge for n8n → Browser Use)..."
+    git clone https://github.com/hoangnb24/browser-n8n-local.git
+    echo "✅ browser-n8n-local cloned"
+else
+    echo "✅ browser-n8n-local already exists"
+fi
+
 # Create required directories
 mkdir -p n8n/demo-data
 mkdir -p backups
@@ -44,3 +53,8 @@ echo "   docker compose up -d"
 echo ""
 echo "📊 Access n8n at: http://localhost:5678"
 echo "🔍 Qdrant API at: http://localhost:6333"
+echo "🤖 Browser Use WebUI at: http://localhost:7788"
+echo "👁️  Browser live view at: http://localhost:6080/vnc.html (password: vncpassword)"
+echo "🔌 Browser Use API at: http://localhost:8000"
+echo ""
+echo "⚠️  Don't forget to set at least one LLM API key in .env (DeepSeek, OpenAI, or Anthropic)"
