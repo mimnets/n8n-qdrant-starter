@@ -222,6 +222,29 @@ async def browser_config():
 
 
 # ---------------------------------------------------------------------------
+# Simple sync endpoint — follows the browser-use-fastapi-docker-server pattern
+# POST /v1/query  →  {"task": "..."}  →  {"result": "..."}
+# ---------------------------------------------------------------------------
+class _QueryRequest(BaseModel):
+    task: str = Field(..., description="Natural-language instruction for the browser agent")
+
+
+class _QueryResponse(BaseModel):
+    result: str = Field(..., description="Final result from the agent")
+
+
+@app.post("/v1/query", response_model=_QueryResponse)
+async def query(payload: _QueryRequest):
+    """Run a browser task and return the result directly (blocks until done)."""
+    if not payload.task.strip():
+        raise HTTPException(status_code=400, detail="Task cannot be empty")
+    output = await TaskManager.run_sync(instruction=payload.task.strip())
+    if output.get("error"):
+        raise HTTPException(status_code=500, detail=output["error"])
+    return _QueryResponse(result=output.get("result", ""))
+
+
+# ---------------------------------------------------------------------------
 # browser-use Cloud API v3 compatibility
 # Mirrors: POST https://api.browser-use.com/api/v3/sessions
 #          GET  https://api.browser-use.com/api/v3/sessions/{session_id}
