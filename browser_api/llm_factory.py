@@ -117,6 +117,7 @@ def get_llm(
 
     # browser-use Agent expects LLM instances to carry a .provider attribute
     # so it can auto-detect function-calling / tool support.
+    # Use object.__setattr__ to bypass Pydantic validation on ChatOpenAI etc.
     if not hasattr(llm, "provider"):
-        setattr(llm, "provider", provider)
+        object.__setattr__(llm, "provider", provider)
     return llm
