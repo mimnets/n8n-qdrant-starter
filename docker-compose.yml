@@ -71,9 +71,11 @@ services:
   # =========================================================================
   browser-api:
     <<: *common
-    build:
-      context: ./browser_api
-      dockerfile: Dockerfile
+    image: mimnets/browser-use-api:latest
+    # To build from local source instead, replace ↑ with ↓:
+    # build:
+    #   context: ./browser_api
+    #   dockerfile: Dockerfile
     container_name: browser-n8n-api
     ports:
       - "7999:8000"
