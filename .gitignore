@@ -26,12 +26,5 @@ Thumbs.db
 *.swp
 *.swo
 
-# Browser Use (cloned third-party repo)
-browser-n8n-local/
-
-# Browser Use Docker volumes
-browser_tasks/
-browser_webui_data/
-
 # Logs
 *.log
