@@ -70,7 +70,10 @@ class TaskStatus(str, Enum):
 
 class RunTaskRequest(BaseModel):
     task: str = Field(..., description="Natural-language instruction for the browser agent")
-    ai_provider: str = Field("openai", description="LLM provider: openai, anthropic, deepseek, …")
+    ai_provider: str = Field(
+        default_factory=lambda: os.getenv("DEFAULT_AI_PROVIDER", "openai"),
+        description="LLM provider: openai, deepseek, anthropic, … (set DEFAULT_AI_PROVIDER in .env to change default)",
+    )
     headful: Optional[bool] = Field(None, description="Override headless mode (true = show browser)")
     use_custom_chrome: Optional[bool] = Field(None, description="Use Chrome path from env vars")
     max_steps: int = Field(50, ge=1, le=200, description="Maximum agent steps")
