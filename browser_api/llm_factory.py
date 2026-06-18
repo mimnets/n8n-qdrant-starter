@@ -115,9 +115,12 @@ def get_llm(
             f"Choose one of: openai, deepseek, anthropic, google, mistral, ollama, azure"
         )
 
-    # browser-use Agent expects LLM instances to carry a .provider attribute
-    # so it can auto-detect function-calling / tool support.
-    # Use object.__setattr__ to bypass Pydantic validation on ChatOpenAI etc.
+    # browser-use Agent expects .provider and .model on the LLM instance,
+    # but LangChain's ChatOpenAI uses .model_name (Pydantic field).
+    # Use object.__setattr__ to bypass Pydantic v2 validation.
     if not hasattr(llm, "provider"):
         object.__setattr__(llm, "provider", provider)
+    if not hasattr(llm, "model"):
+        resolved_model = model or getattr(llm, "model_name", "unknown")
+        object.__setattr__(llm, "model", resolved_model)
     return llm
