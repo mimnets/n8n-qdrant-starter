@@ -222,6 +222,49 @@ async def browser_config():
 
 
 # ---------------------------------------------------------------------------
+# browser-use Cloud API v3 compatibility
+# Mirrors: POST https://api.browser-use.com/api/v3/sessions
+#          GET  https://api.browser-use.com/api/v3/sessions/{session_id}
+# ---------------------------------------------------------------------------
+class _V3RunRequest(BaseModel):
+    task: str = Field(..., description="Natural-language instruction")
+    ai_provider: str = Field(
+        default_factory=lambda: os.getenv("DEFAULT_AI_PROVIDER", "openai"),
+    )
+    max_steps: int = Field(50, ge=1, le=200)
+    keep_alive: bool = Field(False)
+
+
+@app.post("/api/v3/sessions")
+async def v3_create_session(payload: _V3RunRequest):
+    """browser-use Cloud API-compatible: create a session and run a task."""
+    task_id = TaskManager.create(
+        instruction=payload.task,
+        ai_provider=payload.ai_provider,
+        max_steps=payload.max_steps,
+    )
+    return {"session_id": task_id, "status": "created"}
+
+
+@app.get("/api/v3/sessions/{session_id}")
+async def v3_get_session(session_id: str):
+    """browser-use Cloud API-compatible: get session details & result."""
+    data = TaskManager.get(session_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "session_id": data["id"],
+        "status": data["status"],
+        "task": data.get("task", ""),
+        "output": data.get("output"),
+        "error": data.get("error"),
+        "created_at": data.get("created_at"),
+        "finished_at": data.get("finished_at"),
+        "steps": data.get("steps", []),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Live view — embeddable HTML page that polls task status
 # ---------------------------------------------------------------------------
 _LIVE_HTML_TEMPLATE = """\
