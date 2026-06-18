@@ -252,25 +252,24 @@ async def _execute(
         if final:
             _tasks[task_id]["output"] = final
         else:
-            # Collect extracted content from steps that succeeded
-            parts = []
-            for r in result.all_results:
-                if r.extracted_content and not r.error:
-                    parts.append(r.extracted_content)
-                if r.long_term_memory and not r.error:
-                    parts.append(r.long_term_memory)
-            _tasks[task_id]["output"] = "\n".join(parts) if parts else (
+            # Collect extracted content from action results
+            contents = result.extracted_content()
+            _tasks[task_id]["output"] = "\n".join(contents) if contents else (
                 f"Task completed in {result.number_of_steps()} steps "
                 f"(done={result.is_done()}, errors={len(result.errors())})"
             )
 
         # Collect step summaries for the live-view
         step_list = []
-        for i, (ar, mo) in enumerate(zip(result.all_results, result.all_model_outputs)):
+        for i, h in enumerate(result.history):
+            mo = h.model_output
+            extracted = ""
+            if h.result:
+                extracted = h.result[0].extracted_content or h.result[0].long_term_memory or ""
             step_list.append({
                 "step": i + 1,
                 "next_goal": str(mo) if mo else "",
-                "evaluation_previous_goal": ar.extracted_content or ar.long_term_memory or (ar.error or ""),
+                "evaluation_previous_goal": extracted,
             })
         _tasks[task_id]["steps"] = step_list
 
