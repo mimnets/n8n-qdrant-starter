@@ -9,6 +9,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Playwright needs to know where browsers live — use a shared path so both
+# root (during install) and appuser (at runtime) can access them.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+
 # ---------------------------------------------------------------------------
 # System dependencies (Playwright + healthcheck)
 # ---------------------------------------------------------------------------
@@ -41,8 +45,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ---------------------------------------------------------------------------
-# Playwright browsers — MUST run as root so the binaries are system-wide
+# Playwright browsers — install to shared location as root, then make
+# readable by everyone so appuser can use them.
 # ---------------------------------------------------------------------------
+RUN mkdir -p /opt/playwright-browsers && chmod 777 /opt/playwright-browsers
 RUN playwright install chromium
 RUN playwright install-deps chromium
 
