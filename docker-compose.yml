@@ -67,6 +67,7 @@ services:
   # =========================================================================
   # Browser Use API — self-contained REST bridge for browser automation.
   # n8n workflows call this via HTTP Request nodes at http://browser-api:8000
+  # Host port 8001 (8000 is used by Portainer).
   # Inspired by the official browser-use/web-ui project:
   # https://github.com/browser-use/web-ui
   # =========================================================================
@@ -77,7 +78,7 @@ services:
       dockerfile: Dockerfile
     container_name: browser-n8n-api
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - PORT=8000
       # OpenAI / DeepSeek (DeepSeek uses OPENAI_BASE_URL override)
