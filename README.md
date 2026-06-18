@@ -46,12 +46,19 @@ Perfect for OCI free tier, budget VPS, and homelab servers.
 generate secure values, then edit `.env` and set at least one LLM API key:
 
 ```bash
-DEEPSEEK_API_KEY=sk-your-deepseek-key    # recommended — best price/performance
+DEEPSEEK_API_KEY=sk-your-deepseek-key    # budget-friendly
 # or
-OPENAI_API_KEY=sk-your-openai-key
+OPENAI_API_KEY=sk-your-openai-key        # best reliability for browser-use
 # or
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
 ```
+
+> **💡 Tip:** `gpt-4o` (OpenAI) works flawlessly with browser-use. `deepseek-chat` sometimes
+> struggles with function calling — use `deepseek-reasoner` or switch to OpenAI for best results.
+> Set `DEFAULT_AI_PROVIDER` in `.env` to skip specifying it in every API call:
+> ```bash
+> DEFAULT_AI_PROVIDER=openai
+> ```
 
 ## 🚀 Quick Start
 
@@ -98,10 +105,12 @@ Content-Type: application/json
 
 {
   "task": "Go to news.ycombinator.com and return the top 5 headlines",
-  "ai_provider": "deepseek",
   "max_steps": 50
 }
 ```
+
+`ai_provider` is optional — it defaults to `DEFAULT_AI_PROVIDER` from `.env`
+(falls back to `openai`).  Override per-call with `"ai_provider": "deepseek"`.
 
 Poll `/api/v1/task/{id}/status` until `status: "finished"`, then read the `result`.
 
