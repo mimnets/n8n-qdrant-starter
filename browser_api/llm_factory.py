@@ -39,10 +39,11 @@ def get_llm(
         Sampling temperature (default 0 for deterministic agent behaviour).
     """
     provider = provider.strip().lower()
+    llm = None
 
     # -- OpenAI -----------------------------------------------------------
     if provider == "openai":
-        return ChatOpenAI(
+        llm = ChatOpenAI(
             model=model or os.getenv("OPENAI_MODEL_ID", "gpt-4o"),
             temperature=temperature,
             api_key=os.getenv("OPENAI_API_KEY"),
@@ -50,8 +51,8 @@ def get_llm(
         )
 
     # -- DeepSeek (OpenAI-compatible endpoint) ----------------------------
-    if provider == "deepseek":
-        return ChatOpenAI(
+    elif provider == "deepseek":
+        llm = ChatOpenAI(
             model=model or os.getenv("DEEPSEEK_MODEL_ID", "deepseek-chat"),
             temperature=temperature,
             api_key=os.getenv("DEEPSEEK_API_KEY"),
@@ -61,8 +62,8 @@ def get_llm(
         )
 
     # -- Anthropic ---------------------------------------------------------
-    if provider == "anthropic":
-        return ChatAnthropic(
+    elif provider == "anthropic":
+        llm = ChatAnthropic(
             model=model or os.getenv("ANTHROPIC_MODEL_ID", "claude-sonnet-4-6"),
             temperature=temperature,
             api_key=os.getenv("ANTHROPIC_API_KEY"),
@@ -70,16 +71,16 @@ def get_llm(
         )
 
     # -- Google Gemini -----------------------------------------------------
-    if provider == "google":
-        return ChatGoogleGenerativeAI(
+    elif provider == "google":
+        llm = ChatGoogleGenerativeAI(
             model=model or os.getenv("GOOGLE_MODEL_ID", "gemini-2.0-flash"),
             temperature=temperature,
             google_api_key=os.getenv("GOOGLE_API_KEY"),
         )
 
     # -- Mistral -----------------------------------------------------------
-    if provider == "mistral":
-        return ChatMistralAI(
+    elif provider == "mistral":
+        llm = ChatMistralAI(
             model=model or os.getenv("MISTRAL_MODEL_ID", "mistral-large-latest"),
             temperature=temperature,
             api_key=os.getenv("MISTRAL_API_KEY"),
@@ -87,16 +88,16 @@ def get_llm(
         )
 
     # -- Ollama (local) ----------------------------------------------------
-    if provider == "ollama":
-        return ChatOllama(
+    elif provider == "ollama":
+        llm = ChatOllama(
             model=model or os.getenv("OLLAMA_MODEL_ID", "llama3"),
             temperature=temperature,
             base_url=os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434"),
         )
 
     # -- Azure OpenAI ------------------------------------------------------
-    if provider == "azure":
-        return AzureChatOpenAI(
+    elif provider == "azure":
+        llm = AzureChatOpenAI(
             azure_deployment=model or os.getenv(
                 "AZURE_OPENAI_DEPLOYMENT_NAME", ""
             ),
@@ -108,7 +109,14 @@ def get_llm(
             temperature=temperature,
         )
 
-    raise ValueError(
-        f"Unknown AI provider: {provider!r}. "
-        f"Choose one of: openai, deepseek, anthropic, google, mistral, ollama, azure"
-    )
+    else:
+        raise ValueError(
+            f"Unknown AI provider: {provider!r}. "
+            f"Choose one of: openai, deepseek, anthropic, google, mistral, ollama, azure"
+        )
+
+    # browser-use Agent expects LLM instances to carry a .provider attribute
+    # so it can auto-detect function-calling / tool support.
+    if not hasattr(llm, "provider"):
+        setattr(llm, "provider", provider)
+    return llm
