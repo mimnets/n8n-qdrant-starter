@@ -145,6 +145,24 @@ async def run_task(payload: RunTaskRequest):
     return RunTaskResponse(id=task_id, status="created", live_url=f"/live/{task_id}")
 
 
+@app.post("/api/v1/run-task-sync")
+async def run_task_sync(payload: RunTaskRequest):
+    """Start a browser task and block until it finishes — returns the result directly.
+
+    Use this when you need the result immediately without polling.
+    Works well from n8n HTTP Request nodes (up to 300s timeout).
+    """
+    result = await TaskManager.run_sync(
+        instruction=payload.task,
+        ai_provider=payload.ai_provider,
+        headful=payload.headful,
+        use_custom_chrome=payload.use_custom_chrome,
+        max_steps=payload.max_steps,
+        save_browser_data=payload.save_browser_data,
+    )
+    return result
+
+
 @app.get("/api/v1/task/{task_id}")
 async def get_task(task_id: str):
     """Return full task details (steps, result, error, …)."""

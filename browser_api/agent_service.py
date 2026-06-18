@@ -83,6 +83,23 @@ class TaskManager:
         return task_id
 
     @staticmethod
+    async def run_sync(**kwargs) -> dict[str, Any]:
+        """Create a task and block until it finishes, returning the result."""
+        task_id = TaskManager.create(**kwargs)
+        while True:
+            await asyncio.sleep(2)
+            s = TaskManager.status(task_id)
+            if s is None:
+                return {"error": "Task vanished"}
+            if s["status"] in ("finished", "failed", "stopped"):
+                return {
+                    "id": task_id,
+                    "status": s["status"],
+                    "result": s["result"],
+                    "error": s["error"],
+                }
+
+    @staticmethod
     def get(task_id: str) -> Optional[dict[str, Any]]:
         """Return full task dict (minus the agent / browser objects)."""
         t = _tasks.get(task_id)
