@@ -4,6 +4,9 @@
 # Docker volumes
 docker-volumes/
 
+# Image uploads
+image_uploads/
+
 # n8n data
 n8n_storage/
 

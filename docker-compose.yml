@@ -65,6 +65,33 @@ services:
       retries: 5
 
   # =========================================================================
+  # Image Upload API — self-hosted imgbb replacement.
+  # n8n workflows: POST http://image-upload:8001/upload
+  # Host port 8010.
+  # =========================================================================
+  image-upload:
+    <<: *common
+    build:
+      context: ./image-upload-server
+      dockerfile: Dockerfile
+    container_name: n8n-image-upload
+    ports:
+      - "8010:8001"
+    environment:
+      - PORT=8001
+      - UPLOAD_DIR=/app/uploads
+      - UPLOAD_API_KEY=${UPLOAD_API_KEY:-}
+      - MAX_FILE_SIZE_MB=${UPLOAD_MAX_FILE_SIZE_MB:-10}
+      - BASE_URL=${UPLOAD_BASE_URL:-}
+    volumes:
+      - image_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================================================================
   # Browser Use API — persistent browser with cookie persistence.
   # n8n workflows: POST http://browser-api:8000/api/run
   # Host port 7999 (8000/8001 used by Portainer/other services).
@@ -124,3 +151,4 @@ volumes:
   postgres_storage:
   n8n_storage:
   qdrant_storage:
+  image_uploads:

@@ -13,6 +13,7 @@ A lightweight, self-hosted stack combining:
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
 - **[Browser Use API](https://hub.docker.com/r/mimnets/browser-use-api)** — persistent browser agent that n8n controls via HTTP
+- **Image Upload API** — self-hosted imgbb replacement for n8n image uploads
 
 ## 🏗️ Architecture
 
@@ -23,17 +24,21 @@ A lightweight, self-hosted stack combining:
 └──────────────┘     └──────┬───────┘     └─────────────┘
       :5432                 │                   :6333
                             │
-              ┌─────────────┴─────────────┐
-              │    Browser Use API        │
-              │    (REST, port 7999)      │
-              │    Persistent browser     │
-              │    Cookie persistence     │
-              └───────────────────────────┘
+              ┌─────────────┼─────────────┐
+              │             │             │
+    ┌─────────┴────┐  ┌────┴──────────┐  │
+    │ Browser API  │  │ Image Upload  │  │
+    │ (REST, 7999) │  │ (REST, 8010)  │  │
+    │ Persist. br. │  │ imgbb repl.   │  │
+    └──────────────┘  └───────────────┘  │
 ```
 
 - **Browser Use API** — Single container. n8n sends a task description via HTTP,
   the API runs a real Chromium browser to complete it, and returns the result.
   Browser stays alive between calls — cookies and login sessions persist.
+- **Image Upload API** — Single container. n8n uploads images via HTTP,
+  gets back a public URL, and uses that URL in downstream workflow steps
+  (e.g., submitting to a website via the Browser API).
 
 ## ⚠️ Prerequisites
 
@@ -76,6 +81,7 @@ Access **n8n** at `http://localhost:5678` and **Browser API** at `http://localho
 | `postgres` | `postgres:16-alpine` | `5432` *(internal)* | n8n metadata & workflow storage |
 | `n8n` | `n8nio/n8n:latest` | `5678` | Workflow automation engine |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | Vector database for AI embeddings |
+| `image-upload` | *built from source* | `8010` | Self-hosted image upload API |
 | `browser-api` | `mimnets/browser-use-api:latest` | `7999` | Persistent browser agent API |
 
 ### Browser API Docker image
@@ -89,6 +95,87 @@ Access **n8n** at `http://localhost:5678` and **Browser API** at `http://localho
 | Engine | `browser-use==0.1.48` + Playwright Chromium |
 | Browser | Persistent — stays alive between calls |
 | Cookies | Auto-saved to `./browser_profile/cookies.json` |
+
+## 🖼️ Image Upload API
+
+Self-hosted replacement for imgbb. n8n uploads an image, gets back a URL, and
+uses that URL in the next workflow step (e.g., submitting a form that requires
+an image URL, or passing it to the Browser API).
+
+### From n8n workflows
+
+Typical pattern — three nodes in sequence:
+
+```
+┌──────────────────┐     ┌──────────────────────┐     ┌──────────────────┐
+│ 1. Get image     │     │ 2. Upload to server   │     │ 3. Use the URL   │
+│ (HTTP / AI /     │ ──► │ POST /upload           │ ──► │ (Browser API,    │
+│  binary data)    │     │ → returns public URL   │     │  next form, etc) │
+└──────────────────┘     └──────────────────────┘     └──────────────────┘
+```
+
+**Step 2 — HTTP Request node:**
+
+```
+POST http://image-upload:8001/upload
+Body Type: Form-Data
+  → file: {{ $json.binaryPropertyName }}  (mode: "From Binary Property")
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "filename": "20260618_143022_a1b2c3d4.png",
+  "url": "http://image-upload:8001/images/20260618_143022_a1b2c3d4.png",
+  "size_bytes": 245760,
+  "content_type": "image/png"
+}
+```
+
+The `url` field is what you pass to the next node — it's reachable from any
+service on the `ai-starter` Docker network.
+
+### With API key (recommended for exposed ports)
+
+```bash
+# In .env
+UPLOAD_API_KEY=your_secret_key_here
+```
+
+Then in the HTTP Request node, add `?api_key=your_secret_key_here` to the URL:
+
+```
+POST http://image-upload:8001/upload?api_key=your_secret_key_here
+```
+
+Or set an `X-API-Key` header.
+
+### End-to-end example: screenshot → upload → submit to website
+
+1. **Browser API node** — take a screenshot, get binary PNG back
+2. **HTTP Request node** — `POST http://image-upload:8001/upload` with the PNG binary → returns `url`
+3. **Browser API node** — task: `"Fill the image field with {{url}} and submit the form"`
+4. **HTTP Request node** — `DELETE http://image-upload:8001/images/{{filename}}` to clean up
+
+### All endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` | no | Health check + file count |
+| `POST` | `/upload` | optional | Upload an image (multipart/form-data, field `file`) |
+| `GET` | `/images/{filename}` | no | Serve an uploaded image |
+| `GET` | `/images` | yes | List all uploaded images (JSON) |
+| `DELETE` | `/images/{filename}` | yes | Delete an uploaded image |
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `UPLOAD_API_KEY` | *(empty)* | API key for protected endpoints. Empty = no auth. |
+| `UPLOAD_MAX_FILE_SIZE_MB` | `10` | Max upload size in megabytes |
+| `UPLOAD_BASE_URL` | *(auto)* | Public base URL for image links. Auto-detects from request if empty. Set to your domain for external access. |
 
 ## 🤖 Browser Automation
 
@@ -224,6 +311,10 @@ n8n-qdrant-starter/
 │   ├── Dockerfile            # Build your own image
 │   ├── requirements.txt
 │   └── browser_profile/      # Cookie persistence (auto-saved)
+├── image-upload-server/      # Self-hosted image upload API
+│   ├── server.py             # FastAPI app — upload, serve, list, delete
+│   ├── Dockerfile            # Build the image
+│   └── requirements.txt
 └── n8n/
     └── demo-data/            # Drop demo workflow JSON files here
 ```
