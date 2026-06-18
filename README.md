@@ -3,8 +3,8 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Production-ready AI automation stack with n8n, Qdrant vector database, and
-> AI-powered browser automation — all self-hosted.
+> Production-ready AI automation stack — n8n workflows, Qdrant vector search,
+> and AI-powered browser automation, all self-hosted.
 
 ## 📖 Overview
 
@@ -12,10 +12,7 @@ A lightweight, self-hosted stack combining:
 
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
-- **[Browser Use](https://github.com/browser-use/browser-use)** — AI agent that controls a real web browser
-- **[Browser Use WebUI](https://github.com/browser-use/web-ui)** — human-facing Gradio interface with live noVNC view
-
-Perfect for OCI free tier, budget VPS, and homelab servers.
+- **[Browser Use API](https://hub.docker.com/r/mimnets/browser-use-api)** — persistent browser agent that n8n controls via HTTP
 
 ## 🏗️ Architecture
 
@@ -27,38 +24,31 @@ Perfect for OCI free tier, budget VPS, and homelab servers.
       :5432                 │                   :6333
                             │
               ┌─────────────┴─────────────┐
-              │                           │
-    ┌─────────┴─────────┐     ┌──────────┴──────────┐
-    │   Browser API     │     │   Browser WebUI     │
-    │   (REST bridge)   │     │   (Gradio + noVNC)  │
-    │   :8001 (host)    │     │   :7788 / :6080     │
-    └───────────────────┘     └─────────────────────┘
+              │    Browser Use API        │
+              │    (REST, port 7999)      │
+              │    Persistent browser     │
+              │    Cookie persistence     │
+              └───────────────────────────┘
 ```
 
-- **browser-api** — REST API that n8n calls via HTTP Request nodes to run browser
-  automation tasks. Built directly on the `browser-use` Agent library.
-- **browser-webui** — Human-facing Gradio UI for manually running browser tasks,
-  with noVNC live browser view at port `:6080`.
+- **Browser Use API** — Single container. n8n sends a task description via HTTP,
+  the API runs a real Chromium browser to complete it, and returns the result.
+  Browser stays alive between calls — cookies and login sessions persist.
 
-## ⚠️ Important
+## ⚠️ Prerequisites
 
-**The default `.env` values are placeholders.** Run `./scripts/setup.sh` to
-generate secure values, then edit `.env` and set at least one LLM API key:
+**Set at least one LLM API key** in `.env` before starting:
 
 ```bash
-DEEPSEEK_API_KEY=sk-your-deepseek-key    # budget-friendly
+DEEPSEEK_API_KEY=sk-your-key          # budget-friendly (~$0.01/task)
 # or
-OPENAI_API_KEY=sk-your-openai-key        # best reliability for browser-use
+OPENAI_API_KEY=sk-your-key            # most reliable
 # or
-ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+GOOGLE_API_KEY=your-free-gemini-key   # free tier (1,500 req/day)
 ```
 
-> **💡 Tip:** `gpt-4o` (OpenAI) works flawlessly with browser-use. `deepseek-chat` sometimes
-> struggles with function calling — use `deepseek-reasoner` or switch to OpenAI for best results.
-> Set `DEFAULT_AI_PROVIDER` in `.env` to skip specifying it in every API call:
-> ```bash
-> DEFAULT_AI_PROVIDER=openai
-> ```
+> 💡 **Tip:** `gpt-4o` (OpenAI) works flawlessly. `deepseek-chat` sometimes
+> struggles — use `deepseek-reasoner` for better results. Gemini is free.
 
 ## 🚀 Quick Start
 
@@ -70,34 +60,41 @@ cd n8n-qdrant-starter
 # 2. Setup (generates .env with secure keys)
 ./scripts/setup.sh
 
-# 3. Edit .env — add your LLM API key + change passwords
+# 3. Edit .env — add your LLM API key
 nano .env
 
-# 4. Start
+# 4. Start everything
 docker compose up -d
-
-# 5. Build and start the browser services
-docker compose up -d --build browser-api browser-webui
 ```
+
+Access **n8n** at `http://localhost:5678` and **Browser API** at `http://localhost:7999`.
 
 ## 🗄️ Services
 
-| Service | Image / Build | Port (host) | Description |
-|---------|---------------|-------------|-------------|
+| Service | Image | Port (host) | Description |
+|---------|-------|-------------|-------------|
 | `postgres` | `postgres:16-alpine` | `5432` *(internal)* | n8n metadata & workflow storage |
 | `n8n` | `n8nio/n8n:latest` | `5678` | Workflow automation engine |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | Vector database for AI embeddings |
-| `browser-api` | *built from `./browser_api`* | `7999` | Persistent browser API for n8n (port 8001 used by Portainer) |
-| `browser-webui` | *built from official repo* | `7788` | Gradio UI for manual browser tasks |
-| | | `6080` | noVNC — live browser view |
-| | | `5901` | VNC — direct connection |
-| | | `9222` | Chrome DevTools Protocol |
+| `browser-api` | `mimnets/browser-use-api:latest` | `7999` | Persistent browser agent API |
+
+### Browser API Docker image
+
+| Detail | Value |
+|--------|-------|
+| Registry | Docker Hub |
+| Image | `mimnets/browser-use-api:latest` |
+| Size | ~635 MB |
+| Base | `python:3.12-slim` |
+| Engine | `browser-use==0.1.48` + Playwright Chromium |
+| Browser | Persistent — stays alive between calls |
+| Cookies | Auto-saved to `./browser_profile/cookies.json` |
 
 ## 🤖 Browser Automation
 
 ### From n8n workflows
 
-Use the **HTTP Request node** — one call, returns result directly (blocking):
+One **HTTP Request node** — blocks until done, returns the result:
 
 ```
 POST http://browser-api:8000/api/run
@@ -111,6 +108,7 @@ Content-Type: application/json
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -120,38 +118,36 @@ Response:
 }
 ```
 
-#### With logins (sensitive data)
+### With logins (sensitive data)
+
+Use `{{variable}}` placeholders — values are masked in logs:
 
 ```json
 {
   "task": "Log in with {{email}} and {{password}}, then check notifications",
-  "sensitive_data": {"email": "you@example.com", "password": "s3cret"}
+  "sensitive_data": {"email": "you@example.com", "password": "s3cret"},
+  "max_steps": 30
 }
 ```
 
-#### Other endpoints
+### All endpoints
 
-| Endpoint | Use |
-|----------|-----|
-| `GET /health` | Health check |
-| `GET /api/providers` | Check which LLMs are configured |
-| `POST /api/browser/reset` | Clear cookies + fresh browser session |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check → `{"status":"ok"}` |
+| `POST` | `/api/run` | Run a task (blocks, returns result) |
+| `POST` | `/api/browser/reset` | Clear cookies + fresh browser |
+| `GET` | `/api/providers` | List configured LLM providers |
 
-#### Cookie persistence
+### Cookie persistence
 
-Cookies are saved to `./browser_profile/cookies.json` after each task and
-survive container restarts. Login once, stay logged in.
-
-### From the WebUI
-
-Open `http://your-server:7788` — a chat-like interface where you type
-instructions and watch the browser execute them live at
-`http://your-server:6080/vnc.html` (password from `VNC_PASSWORD` in `.env`).
+Cookies are saved to `./browser_profile/cookies.json` after each task.
+They survive container restarts — log in once, stay logged in across tasks.
 
 ### Supported LLM providers
 
-| Provider | `.env` key | `ai_provider` value |
-|----------|-----------|---------------------|
+| Provider | `.env` key | `llm_provider` value |
+|----------|-----------|----------------------|
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek` |
 | OpenAI | `OPENAI_API_KEY` | `openai` |
 | Anthropic | `ANTHROPIC_API_KEY` | `anthropic` |
@@ -159,6 +155,8 @@ instructions and watch the browser execute them live at
 | Mistral | `MISTRAL_API_KEY` | `mistral` |
 | Ollama (local) | *(no key needed)* | `ollama` |
 | Azure OpenAI | `AZURE_OPENAI_API_KEY` | `azure` |
+
+Check `/api/providers` to see which are currently configured.
 
 ## 🔗 Using Qdrant in n8n
 
@@ -191,20 +189,22 @@ docker compose exec -T postgres psql -U n8n n8n < backups/backup_TIMESTAMP/postg
 
 - **Change all default passwords** in `.env` before production use
 - Set strong `N8N_ENCRYPTION_KEY` and `N8N_USER_MANAGEMENT_JWT_SECRET`
-- n8n is exposed on `0.0.0.0:5678` — use a reverse proxy (nginx, Caddy) with HTTPS
+- Use a reverse proxy (nginx, Caddy) with HTTPS for production
 - Qdrant has no built-in auth — keep on internal Docker network
 - Never commit `.env` (it's gitignored)
+- `sensitive_data` values are masked in API logs
 
 ## 🔧 Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| **Port already in use** | Change port mapping in `docker-compose.yml` |
-| **n8n won't start** | Check logs: `docker compose logs n8n` |
-| **Browser API build fails** | Ensure `browser_api/` directory exists, check `docker compose logs browser-api` |
-| **browser-webui pull denied** | Builds from GitHub source — no registry auth needed |
-| **noVNC can't connect** | Wait ~30s for VNC server to start; check password |
-| **Browser task hangs** | Try `"max_steps": 30` — complex pages may need more steps |
+| **Port 7999 in use** | Change host port in `docker-compose.yml` |
+| **n8n won't start** | `docker compose logs n8n` |
+| **Browser API not responding** | `docker compose logs browser-api` |
+| **Task returns error** | Check `/api/providers` — is your LLM configured? |
+| **DeepSeek produces bad results** | Switch to `deepseek-reasoner` or OpenAI/Gemini |
+| **Browser session stale** | `curl -X POST http://localhost:7999/api/browser/reset` |
+| **Cookies not persisting** | Check `./browser_api/browser_profile/` permissions |
 
 ## 📁 Project Structure
 
@@ -219,9 +219,9 @@ n8n-qdrant-starter/
 │   ├── setup.sh              # First-run setup
 │   ├── n8n-entrypoint.sh     # n8n container entrypoint
 │   └── backup.sh             # Backup all services
-├── browser_api/              # Persistent browser REST API
-│   ├── server.py             # Single-file FastAPI app
-│   ├── Dockerfile
+├── browser_api/              # Browser API source (for custom builds)
+│   ├── server.py             # FastAPI app reference
+│   ├── Dockerfile            # Build your own image
 │   ├── requirements.txt
 │   └── browser_profile/      # Cookie persistence (auto-saved)
 └── n8n/
@@ -230,17 +230,12 @@ n8n-qdrant-starter/
 
 ## 🙏 Credits
 
-The browser automation components in this stack are inspired by and built upon
-the excellent work of the **[Browser Use](https://github.com/browser-use)** project:
-
-- **[browser-use](https://github.com/browser-use/browser-use)** — the core Python
-  library that gives AI agents the ability to control a real web browser via
-  Playwright. Licensed under MIT.
-
-- **[browser-use/web-ui](https://github.com/browser-use/web-ui)** — the official
-  Gradio-based WebUI with noVNC live browser view. Our `browser_api/` REST bridge
-  follows the same Agent integration patterns and uses the same underlying
-  `browser_use.Agent` API. Licensed under MIT.
+- **[browser-use](https://github.com/browser-use/browser-use)** — core Python library
+  that gives AI agents the ability to control a real browser via Playwright. MIT.
+- **[browser-use-fastapi-docker-server](https://github.com/gauravdhiman/browser-use-fastapi-docker-server)** —
+  reference FastAPI wrapper pattern by gauravdhiman.
+- **[browser-use/web-ui](https://github.com/browser-use/web-ui)** — official Gradio
+  WebUI whose Agent integration patterns inspired the API design. MIT.
 
 ## 📄 License
 
