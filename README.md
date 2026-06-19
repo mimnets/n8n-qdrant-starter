@@ -162,6 +162,35 @@ Response:
 }
 ```
 
+### Viewing uploaded images
+
+Each uploaded image gets a public URL. You can view it in your browser or use it
+in any workflow step:
+
+| Access from | URL format |
+|-------------|------------|
+| **Browser (host)** | `http://localhost:8010/images/{filename}` |
+| **n8n / Docker network** | `http://image-upload:8001/images/{filename}` |
+| **External (production)** | `https://your-domain.com/images/{filename}` *(requires BASE_URL)* |
+
+To browse all uploaded images as JSON, hit the list endpoint with your API key:
+
+```
+GET http://localhost:8010/images?api_key=your_secret_key_here
+```
+
+Example response:
+```json
+{
+  "images": [
+    {"filename": "20260618_143022_a1b2c3d4.png", "url": "http://localhost:8010/images/20260618_143022_a1b2c3d4.png", "size_bytes": 245760},
+    {"filename": "20260618_150130_d5e6f7g8.jpg", "url": "http://localhost:8010/images/20260618_150130_d5e6f7g8.jpg", "size_bytes": 128000}
+  ],
+  "count": 2,
+  "total_size_bytes": 373760
+}
+```
+
 ### With API key (recommended for exposed ports)
 
 ```bash
