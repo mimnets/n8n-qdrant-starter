@@ -4,7 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Production-ready AI automation stack — n8n workflows, Qdrant vector search,
-> and AI-powered browser automation, all self-hosted.
+> AI-powered browser automation with VNC, and self-hosted image upload.
+> All images pulled from Docker Hub — no local builds needed.
 
 ## 📖 Overview
 
@@ -12,8 +13,8 @@ A lightweight, self-hosted stack combining:
 
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
-- **[Browser Use API](https://hub.docker.com/r/mimnets/browser-use-api)** — persistent browser agent that n8n controls via HTTP
-- **Image Upload API** — self-hosted imgbb replacement for n8n image uploads
+- **[Browser Use API](https://hub.docker.com/r/mimnets/browser-use-api)** — persistent browser agent with VNC that n8n controls via HTTP
+- **[Image Upload API](https://hub.docker.com/r/mimnets/n8n-image-upload)** — self-hosted imgbb replacement for n8n image uploads
 
 ## 🏗️ Architecture
 
@@ -29,16 +30,16 @@ A lightweight, self-hosted stack combining:
     ┌─────────┴────┐  ┌────┴──────────┐  │
     │ Browser API  │  │ Image Upload  │  │
     │ (REST, 7999) │  │ (REST, 8010)  │  │
-    │ Persist. br. │  │ imgbb repl.   │  │
+    │ VNC :6080    │  │ imgbb repl.   │  │
     └──────────────┘  └───────────────┘  │
 ```
 
 - **Browser Use API** — Single container. n8n sends a task description via HTTP,
   the API runs a real Chromium browser to complete it, and returns the result.
   Browser stays alive between calls — cookies and login sessions persist.
+  Includes **VNC** for watching the browser live.
 - **Image Upload API** — Single container. n8n uploads images via HTTP,
-  gets back a public URL, and uses that URL in downstream workflow steps
-  (e.g., submitting to a website via the Browser API).
+  gets back a public URL for downstream workflow steps.
 
 ## ⚠️ Prerequisites
 
@@ -62,27 +63,33 @@ GOOGLE_API_KEY=your-free-gemini-key   # free tier (1,500 req/day)
 git clone https://github.com/mimnets/n8n-qdrant-starter.git
 cd n8n-qdrant-starter
 
-# 2. Setup (generates .env with secure keys)
-./scripts/setup.sh
+# 2. Create .env from the example
+cp .env.example .env
 
 # 3. Edit .env — add your LLM API key
 nano .env
 
-# 4. Start everything
+# 4. Start everything (all images pulled from Docker Hub)
 docker compose up -d
 ```
 
-Access **n8n** at `http://localhost:5678` and **Browser API** at `http://localhost:7999`.
+| Access | URL |
+|--------|-----|
+| **n8n** | `http://localhost:5678` |
+| **Browser API** | `http://localhost:7999` |
+| **VNC (browser live view)** | `http://localhost:6080/vnc.html` |
+| **Qdrant Dashboard** | `http://localhost:6333/dashboard` |
+| **Image Upload API** | `http://localhost:8010` |
 
 ## 🗄️ Services
 
-| Service | Image | Port (host) | Description |
-|---------|-------|-------------|-------------|
-| `postgres` | `postgres:16-alpine` | `5432` *(internal)* | n8n metadata & workflow storage |
-| `n8n` | `n8nio/n8n:latest` | `5678` | Workflow automation engine |
-| `qdrant` | `qdrant/qdrant:latest` | `6333` | Vector database for AI embeddings |
-| `image-upload` | *built from source* | `8010` | Self-hosted image upload API |
-| `browser-api` | `mimnets/browser-use-api:latest` | `7999` | Persistent browser agent API |
+| Service | Image | Port (host) | Source |
+|---------|-------|-------------|--------|
+| `postgres` | `postgres:16-alpine` | `5432` *(internal)* | Docker Hub |
+| `n8n` | `n8nio/n8n:latest` | `5678` | Docker Hub |
+| `qdrant` | `qdrant/qdrant:latest` | `6333` | Docker Hub |
+| `image-upload` | `mimnets/n8n-image-upload:latest` | `8010` | Docker Hub |
+| `browser-api` | `mimnets/browser-use-api:latest` | `7999`, `6080` (VNC), `5900` (VNC) | Docker Hub |
 
 ### Browser API Docker image
 
@@ -90,17 +97,38 @@ Access **n8n** at `http://localhost:5678` and **Browser API** at `http://localho
 |--------|-------|
 | Registry | Docker Hub |
 | Image | `mimnets/browser-use-api:latest` |
-| Size | ~635 MB |
 | Base | `python:3.12-slim` |
-| Engine | `browser-use==0.1.48` + Playwright Chromium |
+| Engine | `browser-use` + Playwright Chromium |
 | Browser | Persistent — stays alive between calls |
+| VNC | noVNC web client on `:6080`, raw VNC on `:5900` |
 | Cookies | Auto-saved to `./browser_profile/cookies.json` |
+
+### Image Upload Docker image
+
+| Detail | Value |
+|--------|-------|
+| Registry | Docker Hub |
+| Image | `mimnets/n8n-image-upload:latest` |
+| Base | `python:3.12-slim` |
+| Framework | FastAPI + uvicorn |
+
+## 🖥️ VNC — Watch the Browser Live
+
+The browser-api container includes a VNC server so you can watch the AI agent
+control the browser in real time.
+
+- **noVNC (web):** Open `http://localhost:6080/vnc.html` in your browser
+- **Raw VNC (desktop client):** Connect to `localhost:5900`
+
+No password by default. Set `VNC_PASSWORD` in `.env` to add authentication.
+
+> 💡 **Tip:** Keep noVNC open during n8n workflow development to debug
+> browser automation tasks visually.
 
 ## 🖼️ Image Upload API
 
 Self-hosted replacement for imgbb. n8n uploads an image, gets back a URL, and
-uses that URL in the next workflow step (e.g., submitting a form that requires
-an image URL, or passing it to the Browser API).
+uses that URL in the next workflow step.
 
 ### From n8n workflows
 
@@ -134,9 +162,6 @@ Response:
 }
 ```
 
-The `url` field is what you pass to the next node — it's reachable from any
-service on the `ai-starter` Docker network.
-
 ### With API key (recommended for exposed ports)
 
 ```bash
@@ -157,7 +182,6 @@ Or set an `X-API-Key` header.
 1. **Browser API node** — take a screenshot, get binary PNG back
 2. **HTTP Request node** — `POST http://image-upload:8001/upload` with the PNG binary → returns `url`
 3. **Browser API node** — task: `"Fill the image field with {{url}} and submit the form"`
-4. **HTTP Request node** — `DELETE http://image-upload:8001/images/{{filename}}` to clean up
 
 ### All endpoints
 
@@ -175,7 +199,7 @@ Or set an `X-API-Key` header.
 |----------|---------|-------------|
 | `UPLOAD_API_KEY` | *(empty)* | API key for protected endpoints. Empty = no auth. |
 | `UPLOAD_MAX_FILE_SIZE_MB` | `10` | Max upload size in megabytes |
-| `UPLOAD_BASE_URL` | *(auto)* | Public base URL for image links. Auto-detects from request if empty. Set to your domain for external access. |
+| `UPLOAD_BASE_URL` | *(auto)* | Public base URL for image links. Auto-detects from request if empty. |
 
 ## 🤖 Browser Automation
 
@@ -280,44 +304,55 @@ docker compose exec -T postgres psql -U n8n n8n < backups/backup_TIMESTAMP/postg
 - Qdrant has no built-in auth — keep on internal Docker network
 - Never commit `.env` (it's gitignored)
 - `sensitive_data` values are masked in API logs
+- Set `UPLOAD_API_KEY` if image-upload port is exposed publicly
+- Set `VNC_PASSWORD` to protect VNC access
 
 ## 🔧 Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| **Port 7999 in use** | Change host port in `docker-compose.yml` |
+| **Port already in use** | Change host ports in `docker-compose.yml` |
 | **n8n won't start** | `docker compose logs n8n` |
 | **Browser API not responding** | `docker compose logs browser-api` |
+| **VNC not loading** | Check `http://localhost:6080/vnc.html` — the browser needs to be actively running a task for the screen to show anything |
 | **Task returns error** | Check `/api/providers` — is your LLM configured? |
 | **DeepSeek produces bad results** | Switch to `deepseek-reasoner` or OpenAI/Gemini |
 | **Browser session stale** | `curl -X POST http://localhost:7999/api/browser/reset` |
-| **Cookies not persisting** | Check `./browser_api/browser_profile/` permissions |
+| **Cookies not persisting** | Check `./browser_profile/` permissions |
 
 ## 📁 Project Structure
 
 ```
 n8n-qdrant-starter/
 ├── .env.example              # Environment template
+├── .env                      # Your config (gitignored)
 ├── .gitignore
-├── docker-compose.yml        # All services
+├── docker-compose.yml        # All services (pull from Docker Hub)
 ├── README.md
 ├── LICENSE                   # MIT
 ├── scripts/
-│   ├── setup.sh              # First-run setup
 │   ├── n8n-entrypoint.sh     # n8n container entrypoint
+│   ├── setup.sh              # First-run setup helper
 │   └── backup.sh             # Backup all services
-├── browser_api/              # Browser API source (for custom builds)
-│   ├── server.py             # FastAPI app reference
-│   ├── Dockerfile            # Build your own image
-│   ├── requirements.txt
-│   └── browser_profile/      # Cookie persistence (auto-saved)
-├── image-upload-server/      # Self-hosted image upload API
-│   ├── server.py             # FastAPI app — upload, serve, list, delete
-│   ├── Dockerfile            # Build the image
-│   └── requirements.txt
+├── browser_profile/          # Browser cookies & session data (volume mount)
 └── n8n/
     └── demo-data/            # Drop demo workflow JSON files here
 ```
+
+> ⚡ **Lightweight by design.** All custom images are pulled from Docker Hub —
+> no local Dockerfiles, no builds, no Python dependencies to install.
+> Just `docker compose up -d` and you're running.
+
+## 🛠️ Building From Source
+
+The Docker images are pre-built on Docker Hub. If you need to modify and rebuild
+them, the Dockerfiles and source code live in their own repositories:
+
+- **Browser Use API:** [mimnets/browser-use-api](https://hub.docker.com/r/mimnets/browser-use-api)
+- **Image Upload API:** [mimnets/n8n-image-upload](https://hub.docker.com/r/mimnets/n8n-image-upload)
+
+To build locally, clone those repos, make changes, then update the image tag in
+`docker-compose.yml` to use `build:` instead of `image:`.
 
 ## 🙏 Credits
 

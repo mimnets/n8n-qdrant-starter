@@ -71,9 +71,11 @@ services:
   # =========================================================================
   image-upload:
     <<: *common
-    build:
-      context: ./image-upload-server
-      dockerfile: Dockerfile
+    image: mimnets/n8n-image-upload:latest
+    # To build from local source instead, replace ↑ with ↓:
+    # build:
+    #   context: ./image-upload-server
+    #   dockerfile: Dockerfile
     container_name: n8n-image-upload
     ports:
       - "8010:8001"
@@ -92,8 +94,10 @@ services:
       retries: 3
 
   # =========================================================================
-  # Browser Use API — persistent browser with cookie persistence.
+  # Browser Use API — persistent browser with cookie persistence + VNC.
   # n8n workflows: POST http://browser-api:8000/api/run
+  # VNC (noVNC):   http://<host>:6080/vnc.html
+  # VNC (raw):     <host>:5900
   # Host port 7999 (8000/8001 used by Portainer/other services).
   # =========================================================================
   browser-api:
@@ -106,10 +110,12 @@ services:
     container_name: browser-n8n-api
     ports:
       - "7999:8000"
+      - "6080:6080"   # noVNC web client
+      - "5900:5900"   # raw VNC (optional, remove if you only use noVNC)
     environment:
       - PORT=8000
       - BROWSER_USE_LOGGING_LEVEL=${LOG_LEVEL:-info}
-      - BROWSER_USE_HEADFUL=false
+      - BROWSER_USE_HEADFUL=true
       # LLM Providers
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - DEEPSEEK_ENDPOINT=${DEEPSEEK_ENDPOINT:-https://api.deepseek.com}
@@ -134,7 +140,7 @@ services:
       - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-01-01-preview}
       - DEFAULT_AI_PROVIDER=${DEFAULT_AI_PROVIDER:-deepseek}
     volumes:
-      - ./browser_api/browser_profile:/app/browser_profile
+      - ./browser_profile:/app/browser_profile
     shm_size: '2gb'
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]

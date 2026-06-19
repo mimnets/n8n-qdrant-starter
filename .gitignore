@@ -4,6 +4,9 @@
 # Docker volumes
 docker-volumes/
 
+# Browser profile (cookies, sessions)
+browser_profile/
+
 # Image uploads
 image_uploads/
 
