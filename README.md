@@ -105,7 +105,7 @@ chmod 777 ./browser_profile
 | Browser | **Google Chrome 149** (amd64) / Chromium (arm64) |
 | Anti-detect | `--disable-blink-features=AutomationControlled`, `--no-sandbox` |
 | VNC | noVNC web client on `:6080`, raw VNC on `:5900` |
-| Cookies | Auto-saved to `./browser_profile/cookies.json` |
+| Cookies | Auto-saved to `./browser_profile/storage_state.json` |
 
 ### Image Upload Docker image
 
@@ -224,7 +224,7 @@ The browser maintains state between tasks so you don't start from scratch each t
 └──────────────┘     └──────────────┘     └────────────────┘
 ```
 
-1. Each task completes → all browser cookies saved to `./browser_profile/cookies.json`
+1. Each task completes → all browser cookies saved to `./browser_profile/storage_state.json`
 2. Next task starts → cookies restored from disk
 3. Container restarts → volume mount preserves `./browser_profile/`
 
@@ -466,7 +466,7 @@ tasks       task first
 
 ### Cookie persistence
 
-Cookies are saved to `./browser_profile/cookies.json` after each task.
+Cookies are saved to `./browser_profile/storage_state.json` after each task.
 They survive container restarts — log in once, stay logged in across tasks.
 
 ### Supported LLM providers
