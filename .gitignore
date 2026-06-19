@@ -4,6 +4,10 @@
 # Docker volumes
 docker-volumes/
 
+# Docker build sources (only needed for multi-arch builds)
+browser_api/
+image-upload-server/
+
 # Browser profile (cookies, sessions)
 browser_profile/
 
