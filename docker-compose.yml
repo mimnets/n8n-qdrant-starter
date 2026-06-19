@@ -94,58 +94,6 @@ services:
       retries: 3
 
   # =========================================================================
-  # Browser Use API — persistent browser with cookie persistence + VNC.
-  # n8n workflows: POST http://browser-api:8000/api/run
-  # VNC (noVNC):   http://<host>:6080/vnc.html
-  # VNC (raw):     <host>:5900
-  # Host port 7999 (8000/8001 used by Portainer/other services).
-  # =========================================================================
-  browser-api:
-    <<: *common
-    image: mimnets/browser-use-api:latest
-    container_name: browser-n8n-api
-    ports:
-      - "7999:8000"
-      - "6080:6080"   # noVNC web client
-      - "5900:5900"   # raw VNC
-    environment:
-      - PORT=8000
-      - BROWSER_USE_LOGGING_LEVEL=${LOG_LEVEL:-info}
-      - BROWSER_USE_HEADFUL=true
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - DEEPSEEK_ENDPOINT=${DEEPSEEK_ENDPOINT:-https://api.deepseek.com}
-      - DEEPSEEK_MODEL_ID=${DEEPSEEK_MODEL_ID:-deepseek-chat}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - OPENAI_ENDPOINT=${OPENAI_ENDPOINT:-https://api.openai.com/v1}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ANTHROPIC_MODEL_ID=${ANTHROPIC_MODEL_ID:-claude-sonnet-4-6}
-      - ANTHROPIC_ENDPOINT=${ANTHROPIC_ENDPOINT:-https://api.anthropic.com}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GOOGLE_MODEL_ID=${GOOGLE_MODEL_ID:-gemini-2.0-flash}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - MISTRAL_MODEL_ID=${MISTRAL_MODEL_ID:-mistral-large-latest}
-      - MISTRAL_ENDPOINT=${MISTRAL_ENDPOINT:-https://api.mistral.ai/v1}
-      - OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://localhost:11434}
-      - OLLAMA_MODEL_ID=${OLLAMA_MODEL_ID:-llama3}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
-      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
-      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-01-01-preview}
-      - DEFAULT_AI_PROVIDER=${DEFAULT_AI_PROVIDER:-deepseek}
-    volumes:
-      - ./browser_profile:/app/browser_profile
-      - ./chrome_profile:/app/chrome_profile
-    shm_size: '2gb'
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # =========================================================================
   # Stealth Browser API — anti-detection Playwright service for LinkedIn/Facebook.
   # Uses full stealth injection, human-like behavior, persistent profiles.
   # n8n workflows: POST http://stealth-browser:8001/api/run
