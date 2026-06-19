@@ -136,30 +136,54 @@ No password by default. Set `VNC_PASSWORD` in `.env` to add authentication.
 ### Manual login via VNC — save credentials for automation
 
 Need to log in to a website once so all future automated tasks skip the login?
-Send a "wait" task to open the browser, then interact via VNC:
+Use a **separate long-wait task** so you have time to type credentials via VNC.
+
+**Important:** Session-check tasks (`max_steps: 2`) finish too fast for manual
+login — the browser closes before you can type. Use a dedicated wait task instead:
 
 ```bash
+# Step 1: Open browser and wait (gives you time to login via VNC)
 curl -X POST http://localhost:7999/api/run \
   -H "Content-Type: application/json" \
-  -d '{"task": "Go to https://example.com/login and wait 5 minutes. Do nothing else.", "llm_provider": "deepseek", "max_steps": 1}'
+  -d '{"task": "Go to https://linkedin.com/login and wait 10 minutes. Do nothing else.", "llm_provider": "deepseek", "max_steps": 1}'
 ```
 
 Then:
 1. Open `http://localhost:6080/vnc.html` — you'll see the browser at the login page
 2. **Click into the VNC window** — your mouse and keyboard control the browser directly
 3. Type in your credentials and log in
-4. When the task ends (after 5 minutes), **cookies auto-save to disk**
+4. When the task ends (after 10 minutes), **cookies auto-save to disk**
 5. All future automated tasks reuse those cookies — no login needed
 
-**One login per site, then it just works.** The browser session survives container
-restarts and `docker compose down/up`.
-
-You can also send this from n8n — an HTTP Request node with:
+**Full n8n workflow pattern:**
 
 ```
-POST http://browser-api:8000/api/run
-Body: {"task": "Go to https://example.com/login and wait 5 minutes.", "llm_provider": "deepseek", "max_steps": 1}
+Step 1: GET /api/cookies?domain=linkedin.com
+            │
+       ┌────┴────┐
+       ▼         ▼
+   has_session  no session
+       │         │
+       ▼         ▼
+   Run your    Send HTTP Request:
+   automation  POST /api/run
+   task        {"task": "Go to https://linkedin.com/login
+                      and wait 10 minutes. Do nothing else.",
+                 "max_steps": 1}
+                  │
+                  ▼
+               Open VNC → manually login
+                  │
+                  ▼
+               Cookies auto-save after task ends
+                  │
+                  ▼
+               Run your automation task
 ```
+
+> 💡 **Tip:** Don't combine session-check and manual login into one task. The
+> check task returns in seconds; the login task needs several minutes.
+> Keep them separate in your workflow.
 
 ## 🍪 Cookie & Session Persistence
 
