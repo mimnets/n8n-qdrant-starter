@@ -71,6 +71,9 @@ nano .env
 
 # 4. Start everything (all images pulled from Docker Hub)
 docker compose up -d
+
+# 5. Fix browser profile permissions (one-time — Docker mounts it as root)
+chmod 777 ./browser_profile
 ```
 
 | Access | URL |
