@@ -112,18 +112,86 @@ docker compose up -d
 | Base | `python:3.12-slim` |
 | Framework | FastAPI + uvicorn |
 
-## 🖥️ VNC — Watch the Browser Live
+## 🖥️ VNC — Watch & Interact with the Browser
 
-The browser-api container includes a VNC server so you can watch the AI agent
-control the browser in real time.
+The browser-api container includes a full VNC server — you can watch the AI
+agent control the browser **and interact with it manually** via mouse and keyboard.
 
-- **noVNC (web):** Open `http://localhost:6080/vnc.html` in your browser
-- **Raw VNC (desktop client):** Connect to `localhost:5900`
+### Access
+
+| Method | URL | Notes |
+|--------|-----|-------|
+| **noVNC (web)** | `http://localhost:6080/vnc.html` | Browser-based, no client needed |
+| **Raw VNC** | `localhost:5900` | Any VNC client (RealVNC, TightVNC, etc.) |
+| **Remote** | `http://<server-ip>:6080/vnc.html` | From any device on the network |
 
 No password by default. Set `VNC_PASSWORD` in `.env` to add authentication.
 
 > 💡 **Tip:** Keep noVNC open during n8n workflow development to debug
 > browser automation tasks visually.
+
+### Manual login via VNC — save credentials for automation
+
+Need to log in to a website once so all future automated tasks skip the login?
+Send a "wait" task to open the browser, then interact via VNC:
+
+```bash
+curl -X POST http://localhost:7999/api/run \
+  -H "Content-Type: application/json" \
+  -d '{"task": "Go to https://example.com/login and wait 5 minutes. Do nothing else.", "llm_provider": "deepseek", "max_steps": 1}'
+```
+
+Then:
+1. Open `http://localhost:6080/vnc.html` — you'll see the browser at the login page
+2. **Click into the VNC window** — your mouse and keyboard control the browser directly
+3. Type in your credentials and log in
+4. When the task ends (after 5 minutes), **cookies auto-save to disk**
+5. All future automated tasks reuse those cookies — no login needed
+
+**One login per site, then it just works.** The browser session survives container
+restarts and `docker compose down/up`.
+
+You can also send this from n8n — an HTTP Request node with:
+
+```
+POST http://browser-api:8000/api/run
+Body: {"task": "Go to https://example.com/login and wait 5 minutes.", "llm_provider": "deepseek", "max_steps": 1}
+```
+
+## 🍪 Cookie & Session Persistence
+
+The browser maintains state between tasks so you don't start from scratch each time.
+
+### How it works
+
+```
+┌──────────────┐     ┌──────────────┐     ┌────────────────┐
+│  Task runs   │────►│  Cookies     │────►│  Next task     │
+│  (logs in,   │     │  auto-saved  │     │  loads cookies │
+│   browses)   │     │  to disk     │     │  → stays in    │
+└──────────────┘     └──────────────┘     └────────────────┘
+```
+
+1. Each task completes → all browser cookies saved to `./browser_profile/cookies.json`
+2. Next task starts → cookies restored from disk
+3. Container restarts → volume mount preserves `./browser_profile/`
+
+### What persists
+
+| Item | Persists? |
+|------|-----------|
+| Login sessions (cookies) | ✅ Yes |
+| Local Storage | ✅ Yes (in browser profile) |
+| Session Storage | ❌ No (cleared on browser restart) |
+| Open tabs | ❌ No (fresh browser each task) |
+
+### Reset the session
+
+```bash
+curl -X POST http://localhost:7999/api/browser/reset
+```
+
+Clears all cookies and starts fresh — like opening a new incognito window.
 
 ## 🖼️ Image Upload API
 
@@ -343,6 +411,51 @@ tar -xzf backups/backup_TIMESTAMP/n8n_data.tar.gz
 docker compose exec -T postgres psql -U n8n n8n < backups/backup_TIMESTAMP/postgres_dump.sql
 ```
 
+## ☁️ Cloud Server Deployment
+
+All images support both `linux/amd64` and `linux/arm64` — works on AWS Graviton,
+Raspberry Pi, OCI Ampere, Apple Silicon, and standard x86_64 servers.
+
+### Quick deploy
+
+```bash
+git clone https://github.com/mimnets/n8n-qdrant-starter.git
+cd n8n-qdrant-starter
+cp .env.example .env
+nano .env                              # Add your API keys
+docker compose up -d
+```
+
+### Update running server
+
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
+### Firewall (OCI / AWS / GCP)
+
+Open these ports in your cloud firewall + instance iptables:
+
+| Port | Service |
+|------|---------|
+| `5678` | n8n web UI |
+| `6080` | noVNC (browser live view) |
+| `7999` | Browser API |
+| `8010` | Image Upload API + admin panel |
+| `6333` | Qdrant (internal only recommended) |
+
+### OCI specific
+
+```bash
+# In OCI Console: Networking → VCN → Security Lists → Add Ingress Rules
+# Then on the instance:
+sudo iptables -I INPUT -p tcp --dport 8010 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 6080 -j ACCEPT
+sudo netfilter-persistent save
+```
+
 ## 🔒 Security Notes
 
 - **Change all default passwords** in `.env` before production use
@@ -359,13 +472,18 @@ docker compose exec -T postgres psql -U n8n n8n < backups/backup_TIMESTAMP/postg
 | Issue | Solution |
 |-------|----------|
 | **Port already in use** | Change host ports in `docker-compose.yml` |
-| **n8n won't start** | `docker compose logs n8n` |
+| **n8n won't start** | `docker compose logs n8n` — check `.env` has valid keys |
 | **Browser API not responding** | `docker compose logs browser-api` |
-| **VNC not loading** | Check `http://localhost:6080/vnc.html` — the browser needs to be actively running a task for the screen to show anything |
-| **Task returns error** | Check `/api/providers` — is your LLM configured? |
+| **VNC shows black screen** | A task must be running. Send a task first, then open VNC. |
+| **VNC page loads but no interaction** | Click into the VNC window to capture mouse/keyboard |
+| **Task returns error** | Check `http://localhost:7999/api/providers` — is your LLM configured? |
 | **DeepSeek produces bad results** | Switch to `deepseek-reasoner` or OpenAI/Gemini |
 | **Browser session stale** | `curl -X POST http://localhost:7999/api/browser/reset` |
-| **Cookies not persisting** | Check `./browser_profile/` permissions |
+| **Cookies not persisting** | Check `./browser_profile/` exists and is writable |
+| **Image admin shows no images** | Check permissions: `docker compose exec image-upload ls -la /app/uploads` |
+| **Image admin JS errors** | Hard refresh: **Ctrl+Shift+R** — browser may cache old page |
+| **Cloud server can't connect** | Check cloud firewall AND instance iptables both have ports open |
+| **Container exits on ARM64** | Run `docker compose pull` — images are multi-arch now |
 
 ## 📁 Project Structure
 
