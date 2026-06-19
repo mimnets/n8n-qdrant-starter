@@ -630,3 +630,58 @@ To build locally, clone those repos, make changes, then update the image tag in
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+## Stealth Browser API — For LinkedIn & Facebook
+
+The standard `browser-api` works for most sites, but **LinkedIn and Facebook** have aggressive anti-bot detection. The `stealth-browser` service handles these with:
+
+- **16 stealth patches** — webdriver undefined, chrome.runtime, WebGL mask, canvas noise, permissions spoofing, and more
+- **Human-like behavior** — variable delays, typing with typos, bezier mouse curves, natural scrolling
+- **Persistent profiles** — full Chromium user_data_dir per site (LinkedIn/Facebook separate)
+- **Consistent fingerprint** — same UA, viewport, locale, timezone throughout a session
+
+### Ports
+
+| Service | Port | Access |
+|---|---|---|
+| Stealth Browser API | `8001` | n8n HTTP Request → `http://stealth-browser:8001/api/run` |
+| noVNC (web) | `6081` | `http://<host>:6081/vnc.html` |
+| Raw VNC | `5901` | Any VNC client |
+
+### One-Time Login (Manual)
+
+```bash
+# 1. Open LinkedIn login page in the browser
+curl -X POST http://localhost:8001/api/navigate \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://linkedin.com/login", "profile": "linkedin"}'
+
+# 2. Open http://localhost:6081/vnc.html → log in manually (with 2FA if needed)
+
+# 3. Save the session
+curl -X POST http://localhost:8001/api/session/save \
+  -H "Content-Type: application/json" \
+  -d '{"profile": "linkedin"}'
+```
+
+### Weekly Auto-Post Example
+
+```bash
+curl -X POST http://localhost:8001/api/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task": "Go to linkedin.com/feed. Post: \"Excited to share our Q2 progress!\" with image /app/uploads/banner.png.",
+    "profile": "linkedin",
+    "max_steps": 50
+  }'
+```
+
+### Check Session State
+
+```bash
+curl "http://localhost:8001/api/cookies?domain=linkedin.com"
+```
+
+Full documentation in [`stealth-browser/README.md`](stealth-browser/README.md)

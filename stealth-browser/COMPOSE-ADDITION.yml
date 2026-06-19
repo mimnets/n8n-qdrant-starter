@@ -1,0 +1,103 @@
+# Stealth Browser API — Docker Compose addition for n8n-qdrant-starter
+#
+# Add this service block to your existing docker-compose.yml
+#
+# ```
+#   stealth-browser:
+#     <<: *common
+#     build:
+#       context: ./stealth-browser
+#       dockerfile: Dockerfile
+#     # OR use pre-built image:
+#     # image: mimnets/stealth-browser-api:latest
+#     container_name: stealth-browser
+#     ports:
+#       - "8001:8001"   # Stealth API (different from browser-api:7999)
+#       - "6081:6080"   # noVNC web client
+#       - "5901:5900"   # raw VNC
+#     environment:
+#       - API_PORT=8001
+#       - PROFILE_DIR=/app/profiles
+#       - COOKIE_DIR=/app/cookies
+#       - HEADLESS=false
+#       - LOG_LEVEL=INFO
+#       - CHROME_PROXY=${CHROME_PROXY:-}
+#       # Optional: pass through API keys if needed
+#     volumes:
+#       - stealth_profiles:/app/profiles
+#       - stealth_cookies:/app/cookies
+#     shm_size: '2gb'
+#     healthcheck:
+#       test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 3
+#       start_period: 30s
+# ```
+#
+# Also add to the volumes section:
+# ```
+# volumes:
+#   stealth_profiles:
+#   stealth_cookies:
+# ```
+ 
+# =========================================================================
+# USAGE IN N8N:
+# =========================================================================
+#
+# LinkedIn Auto-Post Workflow (3 nodes):
+#
+# Node 1: Schedule Trigger (Cron)
+#   └─ Runs every Monday at 9:00 AM
+#
+# Node 2: HTTP Request → POST http://stealth-browser:8001/api/run
+#   Body (JSON):
+#   {
+#     "task": "Go to linkedin.com/feed. Wait for page to load. Click 'Start a post'. Type: \"{{ $json.post_content }}\". Add image from {{ $json.image_url }}. Click Post.",
+#     "profile": "linkedin",
+#     "max_steps": 50
+#   }
+#
+# Node 3: Webhook / Notification
+#
+# =========================================================================
+# VNC ACCESS:
+# =========================================================================
+#
+# noVNC (web): http://localhost:6081/vnc.html
+# Raw VNC:     localhost:5901
+
+# =========================================================================
+# WORKFLOW: Manual Login (one-time setup)
+# =========================================================================
+#
+# Step 1: Trigger → HTTP Request
+#   POST http://stealth-browser:8001/api/navigate
+#   {"url": "https://linkedin.com/login", "profile": "linkedin"}
+#
+# Step 2: Open VNC → http://localhost:6081/vnc.html
+#   — Click into the VNC window
+#   — Type your credentials
+#   — Complete 2FA if needed
+#   — Wait for the feed to load
+#
+# Step 3: HTTP Request
+#   POST http://stealth-browser:8001/api/session/save
+#   {"profile": "linkedin"}
+#
+# Done. All future /api/run calls will reuse the session.
+#
+# =========================================================================
+# DIFFERENCES FROM browser-api:
+# =========================================================================
+#
+# Feature              browser-api (port 7999)     stealth-browser (port 8001)
+# ───────────────────  ─────────────────────────  ──────────────────────────────
+# Engine               browser-use + AI agent     Playwright direct control
+# Anti-detection       Minimal flags              Full stealth injection
+# Human-like behavior  None                       Delays, typing, mouse, scroll
+# Profile persistence  Cookie JSON only           Full user_data_dir
+# AI task execution    browser-use agent          Structured task patterns
+# Multiple profiles    Single                     Per-site (linkedin/facebook)
+# Session fingerprints Random each task            Consistent per profile
