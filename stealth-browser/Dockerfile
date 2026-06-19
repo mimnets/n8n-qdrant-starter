@@ -1,6 +1,9 @@
 # Stealth Browser — Playwright-based anti-detection browser automation
 # For LinkedIn, Facebook, and other high-security sites
-FROM mcr.microsoft.com/playwright:latest
+# Pin Playwright version to match base image browsers
+FROM mcr.microsoft.com/playwright:v1.46.0-jammy
+
+ARG PLAYWRIGHT_VERSION=1.46.0
 
 LABEL org.opencontainers.image.title="Stealth Browser API"
 LABEL org.opencontainers.image.description="Anti-detection browser automation with persistent sessions, VNC, and human-like behavior"
@@ -26,9 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies (pin playwright to match base image)
 RUN pip3 install --no-cache-dir \
-    playwright>=1.50.0 \
+    playwright==${PLAYWRIGHT_VERSION} \
     fastapi>=0.115.0 \
     uvicorn[standard]>=0.32.0 \
     Pillow>=10.0.0 \
@@ -41,9 +44,9 @@ RUN wget -q -O /tmp/chrome.deb \
     && dpkg -i /tmp/chrome.deb || apt-get install -fy \
     && rm /tmp/chrome.deb
 
-# Ensure Playwright browsers
-RUN npx playwright install chromium 2>/dev/null || true && \
-    npx playwright install-deps chromium 2>/dev/null || true
+# Ensure Playwright browsers are installed
+RUN playwright install chromium && \
+    playwright install-deps chromium
 
 WORKDIR /app
 
