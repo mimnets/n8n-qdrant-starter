@@ -141,22 +141,16 @@ Use `/api/navigate` — it opens the page and keeps the browser alive with **no 
 ```bash
 curl -X POST http://localhost:7999/api/navigate \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://linkedin.com/login", "wait_minutes": 10}'
+  -d '{"url": "https://linkedin.com/login"}'
 ```
 
 What happens:
-1. Browser opens and navigates to the URL (no AI — just Playwright)
-2. Sleeps for `wait_minutes` — the page stays open and interactive via VNC
-3. You log in manually through VNC
-4. After the wait period, cookies auto-save
-5. All future `/api/run` tasks have your session
-
-Then:
-1. Open `http://localhost:6080/vnc.html` — you'll see the browser at the login page
-2. **Click into the VNC window** — your mouse and keyboard control the browser directly
-3. Type in your credentials and log in
-4. When the wait expires, **cookies auto-save to disk**
-5. All future automated tasks reuse those cookies — no login needed
+1. Browser opens and navigates to the URL (Playwright, no AI)
+2. **Returns immediately** — the page stays open, no timeout
+3. Open `http://localhost:6080/vnc.html` — see the login page
+4. **Click into the VNC window** — type credentials, log in
+5. Call `POST /api/session/save` to persist cookies immediately
+6. All future `/api/run` tasks have your session
 
 **Full n8n workflow pattern:**
 
@@ -170,22 +164,22 @@ Step 1: GET /api/cookies?domain=linkedin.com
        ▼         ▼
    Run your    HTTP Request:
    automation  POST /api/navigate
-   task        {"url": "https://linkedin.com/login",
-                 "wait_minutes": 10}
+   task        {"url": "https://linkedin.com/login"}
                   │
                   ▼
                Open VNC → manually login
                   │
                   ▼
-               Cookies auto-save after wait expires
+               HTTP Request:
+               POST /api/session/save
                   │
                   ▼
                Run your automation task
 ```
 
-> 💡 **Tip:** `/api/navigate` doesn't use the LLM — it's just Playwright
-> opening a URL and sleeping. Use it any time you need the browser to stay
-> open for manual interaction via VNC.
+> 💡 **Tip:** `/api/navigate` returns instantly — no AI, no timeout. The browser
+> stays open until the next `/api/run` task or `/api/browser/reset`. Use
+> `/api/session/save` to persist cookies immediately after logging in.
 
 ## 🍪 Cookie & Session Persistence
 
@@ -395,6 +389,7 @@ Use `{{variable}}` placeholders — values are masked in logs:
 | `GET` | `/api/providers` | List configured LLM providers |
 | `GET` | `/api/cookies` | List saved cookies (optional `?domain=`) |
 | `POST` | `/api/navigate` | Open URL + keep browser alive for VNC login |
+| `POST` | `/api/session/save` | Manually save cookies after VNC login |
 
 ### Check session status before automation
 
