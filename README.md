@@ -206,6 +206,23 @@ POST http://image-upload:8001/upload?api_key=your_secret_key_here
 
 Or set an `X-API-Key` header.
 
+### Admin panel
+
+A built-in web UI for browsing, viewing, and deleting uploaded images:
+
+```
+http://localhost:8010/admin
+```
+
+If `UPLOAD_API_KEY` is set, pass it as a query parameter:
+
+```
+http://localhost:8010/admin?api_key=your_secret_key_here
+```
+
+The admin panel shows an image gallery with thumbnails, file sizes, upload dates,
+and one-click delete. No separate database or tool needed.
+
 ### End-to-end example: screenshot → upload → submit to website
 
 1. **Browser API node** — take a screenshot, get binary PNG back
@@ -216,6 +233,7 @@ Or set an `X-API-Key` header.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| `GET` | `/admin` | optional | Web-based admin panel — browse, view, delete images |
 | `GET` | `/health` | no | Health check + file count |
 | `POST` | `/upload` | optional | Upload an image (multipart/form-data, field `file`) |
 | `GET` | `/images/{filename}` | no | Serve an uploaded image |
