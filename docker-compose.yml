@@ -141,6 +141,7 @@ services:
       - DEFAULT_AI_PROVIDER=${DEFAULT_AI_PROVIDER:-deepseek}
     volumes:
       - ./browser_profile:/app/browser_profile
+      - ./chrome_profile:/app/chrome_profile
     shm_size: '2gb'
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]

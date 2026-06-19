@@ -101,8 +101,9 @@ chmod 777 ./browser_profile
 | Registry | Docker Hub |
 | Image | `mimnets/browser-use-api:latest` |
 | Base | `python:3.12-slim` |
-| Engine | `browser-use` + Playwright Chromium |
-| Browser | Persistent — stays alive between calls |
+| Engine | `browser-use` + Playwright |
+| Browser | **Google Chrome** (amd64) / Chromium (arm64) |
+| Profile | Persistent Chrome profile at `./chrome_profile/` |
 | VNC | noVNC web client on `:6080`, raw VNC on `:5900` |
 | Cookies | Auto-saved to `./browser_profile/cookies.json` |
 
@@ -129,6 +130,49 @@ agent control the browser **and interact with it manually** via mouse and keyboa
 | **Remote** | `http://<server-ip>:6080/vnc.html` | From any device on the network |
 
 No password by default. Set `VNC_PASSWORD` in `.env` to add authentication.
+
+## 🧠 Chrome Profile & Anti-Detection
+
+The browser-api uses **real Google Chrome** (amd64) or Chromium (arm64) with a
+persistent user profile. This means:
+
+- **Google Password Manager** syncs if you sign into Chrome
+- **Cookies + sessions** survive restarts (like a real browser)
+- **Browser fingerprint** stays consistent — sites trust you more
+- **`navigator.webdriver`** is disabled — bypasses bot detection
+
+Profile stored at `./chrome_profile/` (gitignored, volume-mounted).
+
+### Update Chrome to latest version
+
+The Docker image ships a snapshot of Chrome. To update Chrome without waiting
+for a new image:
+
+```bash
+docker compose exec -u root browser-api apt-get update
+docker compose exec -u root browser-api apt-get install -y google-chrome-stable
+docker compose exec -u root browser-api rm -rf /var/lib/apt/lists/*
+```
+
+Or rebuild the image yourself to bake in the latest Chrome:
+
+```bash
+# Clone the build source (gitignored from main repo)
+git clone https://github.com/mimnets/n8n-qdrant-starter.git build-temp
+cd build-temp
+git checkout 2038874~1 -- browser_api/   # restore build files
+# Edit browser_api/Dockerfile if needed
+docker build -t mimnets/browser-use-api:latest -f browser_api/Dockerfile browser_api
+docker push mimnets/browser-use-api:latest
+```
+
+### Residential proxy (optional)
+
+For high-security sites, add a proxy in `.env`:
+
+```bash
+CHROME_PROXY=http://user:pass@your-residential-proxy:8080
+```
 
 > 💡 **Tip:** Keep noVNC open during n8n workflow development to debug
 > browser automation tasks visually.

@@ -8,6 +8,9 @@ docker-volumes/
 browser_api/
 image-upload-server/
 
+# Chrome profile (passwords, sessions, fingerprints)
+chrome_profile/
+
 # Browser profile (cookies, sessions)
 browser_profile/
 
