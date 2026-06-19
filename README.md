@@ -367,6 +367,51 @@ Use `{{variable}}` placeholders — values are masked in logs:
 | `POST` | `/api/run` | Run a task (blocks, returns result) |
 | `POST` | `/api/browser/reset` | Clear cookies + fresh browser |
 | `GET` | `/api/providers` | List configured LLM providers |
+| `GET` | `/api/cookies` | List saved cookies (optional `?domain=`) |
+
+### Check session status before automation
+
+Use the `/api/cookies` endpoint to verify you're logged in before running
+automation tasks:
+
+```bash
+# List all saved cookies
+curl http://localhost:7999/api/cookies
+
+# Check if logged in to a specific site
+curl http://localhost:7999/api/cookies?domain=example.com
+```
+
+Response:
+```json
+{
+  "domain": "example.com",
+  "has_session": true,
+  "cookie_count": 4,
+  "cookie_names": ["sessionid", "csrftoken", "remember_me", "user_prefs"]
+}
+```
+
+**n8n workflow pattern:**
+
+```
+┌───────────────────┐
+│ HTTP Request      │ GET /api/cookies?domain=example.com
+│ Check session     │
+└────────┬──────────┘
+         │
+    ┌────┴────┐
+    │ IF node │ has_session == true ?
+    └────┬────┘
+         │
+   ┌─────┴─────┐
+   ▼           ▼
+  true        false
+   │           │
+   ▼           ▼
+Run auto    VNC login
+tasks       task first
+```
 
 ### Cookie persistence
 
