@@ -105,7 +105,7 @@ docker compose ps
 | Registry | Docker Hub |
 | Image | `mimnets/stealth-browser-api:latest` |
 | Base | `mcr.microsoft.com/playwright:v1.46.0-jammy` |
-| Engine | Playwright (no AI required) |
+| Engine | **AI Agent** — vision-based LLM drives the browser (supports OpenAI, DeepSeek, Anthropic, Google) |
 | Browser | Chromium (matches base image) |
 | Anti-detection | 16 stealth patches — webdriver, chrome.runtime, WebGL, canvas, fonts, etc. |
 | Human behavior | Bezier mouse curves, randomized delays, typing with typos |
@@ -180,13 +180,27 @@ Save the current browser session (cookies + storage) to a named profile.
 ```
 
 ### POST `/api/run`
-Execute a browser automation task. Returns when done.
+Execute a browser automation task using the AI agent (vision-based — the LLM sees the page and decides what to click).
 ```json
 {
-  "task": "Go to example.com and get the page title",
-  "profile": "linkedin"
+  "task": "Go to the LinkedIn company page admin dashboard and post the article content",
+  "profile": "linkedin",
+  "max_steps": 30,
+  "llm_provider": "openai",
+  "pause_on_captcha": true
 }
 ```
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `task` | Plain English description of what to do | _(required)_ |
+| `profile` | Browser profile to use (saved sessions) | `"default"` |
+| `url` | Starting URL (optional — or include in task) | `null` |
+| `max_steps` | Maximum AI steps before returning | `30` |
+| `llm_provider` | LLM to drive the browser: `openai`, `deepseek`, `anthropic`, `google` | `"openai"` |
+| `pause_on_captcha` | Pause task if CAPTCHA is detected | `false` |
+
+> ⚠️ You must have an LLM API key in `.env` for the AI agent to work. OpenAI (`gpt-4o`) is recommended.
 
 ### GET `/api/cookies`
 Check if a domain has active cookies (login check).
