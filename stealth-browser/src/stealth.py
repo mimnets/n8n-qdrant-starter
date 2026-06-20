@@ -143,8 +143,7 @@ VIEWPORTS = [
     {"width": 1440, "height": 900},
     {"width": 1536, "height": 864},
     {"width": 1366, "height": 768},
-    {"width": 2560, "height": 1440},
-]
+  ]
 
 # Timezones matched to UA region
 TIMEZONES = {
