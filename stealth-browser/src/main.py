@@ -393,25 +393,30 @@ async def run_task(req: RunRequest):
             await page.goto(req.url, wait_until="domcontentloaded")
             await asyncio.sleep(human_delay(2, 4))
 
-        # Run the AI agent
-        result = await run_ai_agent(
-            page=page,
-            task=req.task,
-            max_steps=req.max_steps,
-            provider=req.llm_provider,
-        )
+        # Run the AI agent (with fallback)
+        try:
+            result = await run_ai_agent(
+                page=page,
+                task=req.task,
+                max_steps=req.max_steps,
+                provider=req.llm_provider,
+            )
+        except Exception as agent_err:
+            logger.warning(f"AI agent failed, falling back to handler: {agent_err}")
+            result = await run_browser_task(req.task, page, browser.context)
 
         # Save cookies after task
         cookie_count = await browser.save_session(req.profile)
 
+        is_success = not (result.startswith("❌") or "❌" in result)
         await session_manager.complete_task(result, steps=req.max_steps)
         return {
-            "success": not result.startswith("❌"),
+            "success": is_success,
             "task_id": task_id,
             "result": result,
             "steps_taken": req.max_steps,
             "cookies_saved": cookie_count,
-            "error": None if not result.startswith("❌") else result,
+            "error": None if is_success else result,
         }
 
     except Exception as e:
