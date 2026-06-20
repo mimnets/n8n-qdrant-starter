@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from .browser import StealthBrowser
 from .session_manager import SessionManager
-from .agent import run_ai_agent
+from .agent import run_browser_agent
 from .humanize import human_delay
 
 # ─── Logging ─────────────────────────────────────────────
@@ -123,12 +123,13 @@ async def run_task(req: RunRequest):
             await page.goto(req.url, wait_until="domcontentloaded")
             await asyncio.sleep(human_delay(2, 4))
 
-        # Run the AI agent — uses LLM vision to drive the browser
-        result = await run_ai_agent(
+        # Run the DOM-based browser agent (no screenshots, works with any LLM)
+        result = await run_browser_agent(
             page=page,
             task=req.task,
             max_steps=req.max_steps,
             provider=req.llm_provider,
+            sensitive_data=req.sensitive_data,
         )
 
         # Save cookies after task
