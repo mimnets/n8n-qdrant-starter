@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from .browser import StealthBrowser
 from .session_manager import SessionManager
+from .agent import run_ai_agent
 from .humanize import (
     human_delay, async_sleep, human_click, human_scroll,
     simulate_page_load_noise, human_type,
@@ -62,7 +63,9 @@ class RunRequest(BaseModel):
     task: str = Field(..., description="Task description for the browser agent")
     profile: str = Field("default", description="Browser profile name")
     url: str = Field(None, description="Starting URL (optional)")
-    max_steps: int = Field(50, ge=1, le=200, description="Maximum action steps")
+    max_steps: int = Field(30, ge=1, le=200, description="Maximum action steps")
+    llm_provider: str = Field("openai", description="LLM provider: openai, deepseek, anthropic, google")
+    pause_on_captcha: bool = Field(False, description="Pause if captcha detected")
     sensitive_data: dict = Field({}, description="Sensitive values (masked in logs)")
 
 class NavigateRequest(BaseModel):
@@ -390,20 +393,25 @@ async def run_task(req: RunRequest):
             await page.goto(req.url, wait_until="domcontentloaded")
             await asyncio.sleep(human_delay(2, 4))
 
-        # Run the task
-        result = await run_browser_task(req.task, page, browser.context)
+        # Run the AI agent
+        result = await run_ai_agent(
+            page=page,
+            task=req.task,
+            max_steps=req.max_steps,
+            provider=req.llm_provider,
+        )
 
         # Save cookies after task
         cookie_count = await browser.save_session(req.profile)
 
-        await session_manager.complete_task(result, steps=10)
+        await session_manager.complete_task(result, steps=req.max_steps)
         return {
-            "success": True,
+            "success": not result.startswith("❌"),
             "task_id": task_id,
             "result": result,
-            "steps_taken": 10,
+            "steps_taken": req.max_steps,
             "cookies_saved": cookie_count,
-            "error": None,
+            "error": None if not result.startswith("❌") else result,
         }
 
     except Exception as e:

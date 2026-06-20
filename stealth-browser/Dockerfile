@@ -35,7 +35,8 @@ RUN pip3 install --no-cache-dir \
     fastapi>=0.115.0 \
     uvicorn[standard]>=0.32.0 \
     Pillow>=10.0.0 \
-    python-multipart>=0.0.9
+    python-multipart>=0.0.9 \
+    openai>=1.0.0
 
 # Install Google Chrome (real Chrome, not Chromium — better fingerprint)
 # Playwright image already has Chromium, but let's add real Chrome for authenticity
