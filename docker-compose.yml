@@ -115,7 +115,7 @@ services:
       - PROXY_HOST=${LINKEDIN_PROXY_HOST:-}
       - PROXY_PORT=${LINKEDIN_PROXY_PORT:-}
       - PROXY_USERNAME=${LINKEDIN_PROXY_USER:-}
-      - PROXY_PASSWORD=${LINK…SS:-}
+      - PROXY_PASSWORD=${LINKEDIN_PROXY_PASS:-}
     volumes:
       - camofox_profiles:/home/node/.camofox/profiles
       - camofox_cookies:/home/node/.camofox/cookies
