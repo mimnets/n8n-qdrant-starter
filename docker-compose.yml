@@ -94,38 +94,34 @@ services:
       retries: 3
 
   # =========================================================================
-  # Stealth Browser API — anti-detection Playwright service for LinkedIn/Facebook.
-  # Uses full stealth injection, human-like behavior, persistent profiles.
-  # n8n workflows: POST http://stealth-browser:8001/api/run
-  # VNC (noVNC):   http://<host>:6081/vnc.html
-  # VNC (raw):     <host>:5901
+  # Camofox Browser — anti-detection headless browser powered by Camoufox (Firefox).
+  # C++-level fingerprint spoofing for LinkedIn/Facebook automation.
+  # REST API: navigate, click, type, snapshot with stable element refs.
+  # Sessions auto-persist — log in once via VNC, reuse forever.
+  # n8n workflows: http://camofox:9377/tabs
+  # VNC (noVNC):   http://<host>:6080/vnc.html
   # =========================================================================
-  stealth-browser:
+  camofox:
     <<: *common
-    image: mimnets/stealth-browser-api:latest
-    # To build from local source instead:
-    # build:
-    #   context: ./stealth-browser
-    #   dockerfile: Dockerfile
-    container_name: stealth-browser
+    image: ghcr.io/jo-inc/camofox-browser:latest
+    container_name: camofox
     ports:
-      - "8001:8001"   # Stealth API
-      - "6081:6080"   # noVNC web client
-      - "5901:5900"   # raw VNC
+      - "9377:9377"   # Camofox REST API
+      - "6080:6080"   # noVNC web client
     environment:
-      - API_PORT=8001
-      - PROFILE_DIR=/app/profiles
-      - COOKIE_DIR=/app/cookies
-      - HEADLESS=false
-      - LOG_LEVEL=INFO
-      - CHROME_PROXY=${CHROME_PROXY:-}
-      - VNC_PASSWORD=${VNC_PASSWORD:-}
+      - CAMOFOX_PORT=9377
+      - CAMOFOX_API_KEY=${CAMOFOX_API_KEY:-}
+      - ENABLE_VNC=true
+      - PROXY_HOST=${LINKEDIN_PROXY_HOST:-}
+      - PROXY_PORT=${LINKEDIN_PROXY_PORT:-}
+      - PROXY_USERNAME=${LINKEDIN_PROXY_USER:-}
+      - PROXY_PASSWORD=${LINK…SS:-}
     volumes:
-      - stealth_profiles:/app/profiles
-      - stealth_cookies:/app/cookies
-    shm_size: '2gb'
+      - camofox_profiles:/home/node/.camofox/profiles
+      - camofox_cookies:/home/node/.camofox/cookies
+    shm_size: '1gb'
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9377/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -140,5 +136,5 @@ volumes:
   n8n_storage:
   qdrant_storage:
   image_uploads:
-  stealth_profiles:
-  stealth_cookies:
+  camofox_profiles:
+  camofox_cookies:
