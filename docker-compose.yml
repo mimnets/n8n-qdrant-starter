@@ -111,14 +111,15 @@ services:
     environment:
       - CAMOFOX_PORT=9377
       - CAMOFOX_API_KEY=${CAMOFOX_API_KEY:-}
-      - ENABLE_VNC=true
       - PROXY_HOST=${LINKEDIN_PROXY_HOST:-}
       - PROXY_PORT=${LINKEDIN_PROXY_PORT:-}
       - PROXY_USERNAME=${LINKEDIN_PROXY_USER:-}
       - PROXY_PASSWORD=${LINKEDIN_PROXY_PASS:-}
+      - VNC_BIND=0.0.0.0
     volumes:
       - camofox_profiles:/home/node/.camofox/profiles
       - camofox_cookies:/home/node/.camofox/cookies
+      - ./camofox.config.json:/app/camofox.config.json:ro
     shm_size: '1gb'
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9377/health || exit 1"]
