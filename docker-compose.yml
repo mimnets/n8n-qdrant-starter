@@ -40,6 +40,8 @@ services:
     ports:
       - "5678:5678"
     environment:
+      - TZ=Asia/Dhaka
+      - GENERIC_TIMEZONE=Asia/Dhaka
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
       - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
       - DB_TYPE=postgresdb
@@ -50,8 +52,8 @@ services:
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-n8n}
       - N8N_SECURE_COOKIE=false
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
-      - N8N_URL=https://n8n.yourdomain.com
-      - WEBHOOK_URL=https://n8n.yourdomain.com
+      - N8N_URL=https://n8n.mimnets.com
+      - WEBHOOK_URL=https://n8n.mimnets.com
     volumes:
       - n8n_storage:/home/node/.n8n
       - ./scripts/n8n-entrypoint.sh:/entrypoint.sh:ro
@@ -94,39 +96,34 @@ services:
       retries: 3
 
   # =========================================================================
-  # Camofox Browser — anti-detection headless browser powered by Camoufox (Firefox).
-  # C++-level fingerprint spoofing for LinkedIn/Facebook automation.
-  # REST API: navigate, click, type, snapshot with stable element refs.
-  # Sessions auto-persist — log in once via VNC, reuse forever.
-  # n8n workflows: http://camofox:9377/tabs
-  # VNC (noVNC):   http://<host>:6080/vnc.html
+  # SeleniumBase Stealth Browser — replaces Camoufox.
+  # SeleniumBase CDP Mode passes every bot-detection test (BrowserScan,
+  # Cloudflare, hCaptcha). REST API: navigate, click, type, screenshot,
+  # scrape, JS execution. Drop-in compatible with Camoufox API.
+  # n8n workflows: http://seleniumbase:9377/navigate
   # =========================================================================
-  camofox:
+  seleniumbase:
     <<: *common
-    image: ghcr.io/jo-inc/camofox-browser:latest
-    container_name: camofox
+    build:
+      context: ./seleniumbase
+      dockerfile: Dockerfile
+    container_name: seleniumbase
     ports:
-      - "9377:9377"   # Camofox REST API
-      - "6080:6080"   # noVNC web client
+      - "9377:9377"   # SeleniumBase REST API (same port, drop-in replacement)
     environment:
-      - CAMOFOX_PORT=9377
-      - CAMOFOX_API_KEY=${CAMOFOX_API_KEY:-}
-      - PROXY_HOST=${LINKEDIN_PROXY_HOST:-}
-      - PROXY_PORT=${LINKEDIN_PROXY_PORT:-}
-      - PROXY_USERNAME=${LINKEDIN_PROXY_USER:-}
-      - PROXY_PASSWORD=${LINKEDIN_PROXY_PASS:-}
-      - VNC_BIND=0.0.0.0
+      - SELENIUMBASE_PORT=9377
+      - SELENIUMBASE_API_KEY=${SELENIUMBASE_API_KEY:-}
+      - HEADLESS=true
+      - DISPLAY=:99
     volumes:
-      - camofox_profiles:/home/node/.camofox/profiles
-      - camofox_cookies:/home/node/.camofox/cookies
-      - ./camofox.config.json:/app/camofox.config.json:ro
-    shm_size: '1gb'
+      - seleniumbase_data:/app/data
+    shm_size: '2gb'
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9377/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
 networks:
   ai-starter:
@@ -137,5 +134,4 @@ volumes:
   n8n_storage:
   qdrant_storage:
   image_uploads:
-  camofox_profiles:
-  camofox_cookies:
+  seleniumbase_data:
