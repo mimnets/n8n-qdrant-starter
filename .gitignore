@@ -33,6 +33,9 @@ qdrant_storage/
 # Backups
 backups/
 
+# VidAPI data (rendered videos, DB, assets)
+vidapi/data/
+
 # OS files
 .DS_Store
 Thumbs.db
