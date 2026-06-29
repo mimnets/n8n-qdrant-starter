@@ -1,0 +1,18 @@
+# Default owner for all files
+* @vidapi-maintainers
+
+# Core rendering pipeline
+app/renderers/ @vidapi-maintainers
+app/services/render_service.py @vidapi-maintainers
+
+# API routes and schemas
+app/api/ @vidapi-maintainers
+app/models/ @vidapi-maintainers
+
+# Database and migrations
+app/db/ @vidapi-maintainers
+alembic/ @vidapi-maintainers
+
+# Security-sensitive: asset fetching and SSRF
+app/services/ssrf.py @vidapi-maintainers
+app/services/asset_service.py @vidapi-maintainers

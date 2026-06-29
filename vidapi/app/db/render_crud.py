@@ -1,0 +1,530 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, cast
+
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col, select
+
+from app.db.models import Render
+from app.db.time import utcnow_naive
+from app.models.output_artifacts import (
+    StoredCaptionMetadata,
+    StoredOutputMetadata,
+    StoredPosterMetadata,
+)
+from app.models.render import RenderStatus
+
+
+@dataclass(frozen=True)
+class RenderStatusCount:
+    status: str
+    count: int
+
+
+@dataclass(frozen=True)
+class RendererFailureCount:
+    renderer: str
+    error_code: str
+    count: int
+
+
+@dataclass(frozen=True)
+class RenderTimingSample:
+    render_id: str
+    seconds: float
+
+
+async def _commit_and_refresh(session: AsyncSession, *instances: object) -> None:
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
+
+    for instance in instances:
+        await session.refresh(instance)
+
+
+async def create_render(
+    session: AsyncSession,
+    *,
+    template_id: str | None = None,
+    template_version_id: str | None = None,
+    callback_url: str | None = None,
+    renderer: str | None = None,
+) -> Render:
+    """Create a new render record in QUEUED status."""
+    render = Render(
+        template_id=template_id,
+        template_version_id=template_version_id,
+        callback_url=callback_url,
+        renderer=renderer,
+    )
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def get_render_by_id(
+    session: AsyncSession,
+    render_id: str,
+) -> Render | None:
+    """Return a render by ID or None if not found."""
+    result = await session.execute(select(Render).where(Render.id == render_id))
+    return result.scalar_one_or_none()
+
+
+async def update_render_status(
+    session: AsyncSession,
+    render_id: str,
+    new_status: RenderStatus,
+    *,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    stage: str | None = None,
+    progress: int | None = None,
+) -> Render | None:
+    """Transition a render to a new status with state-machine validation.
+
+    Returns the updated render or None if not found.
+    Raises ValueError on invalid status transition.
+    """
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    current = RenderStatus(render.status)
+    current.transition_to(new_status)
+
+    render.status = new_status.value
+    render.updated_at = utcnow_naive()
+
+    if stage is not None:
+        render.stage = stage
+    if progress is not None:
+        render.progress = progress
+    if error_code is not None:
+        render.error_code = error_code
+    if error_message is not None:
+        render.error_message = error_message
+
+    if new_status == RenderStatus.FETCHING and render.started_at is None:
+        render.started_at = utcnow_naive()
+
+    if new_status.is_terminal:
+        render.completed_at = utcnow_naive()
+        if new_status == RenderStatus.SUCCEEDED:
+            render.progress = 100
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def list_renders(
+    session: AsyncSession,
+    *,
+    offset: int = 0,
+    limit: int = 20,
+    status_filter: RenderStatus | None = None,
+) -> tuple[list[Render], int]:
+    """Return paginated render list ordered by created_at DESC.
+
+    Returns (items, total_count).
+    """
+    base = select(Render)
+    count_stmt = select(func.count()).select_from(Render)
+
+    if status_filter is not None:
+        base = base.where(Render.status == status_filter.value)
+        count_stmt = count_stmt.where(Render.status == status_filter.value)
+
+    count_result = await session.execute(count_stmt)
+    total = count_result.scalar_one()
+
+    query = base.order_by(col(Render.created_at).desc()).offset(offset).limit(limit)
+    result = await session.execute(query)
+    items = list(result.scalars().all())
+
+    return items, total
+
+
+async def count_renders_by_status(session: AsyncSession) -> list[RenderStatusCount]:
+    """Return render counts grouped by status with deterministic ordering."""
+    result = await session.execute(
+        select(Render.status, func.count())
+        .select_from(Render)
+        .group_by(Render.status)
+        .order_by(Render.status)
+    )
+    return [
+        RenderStatusCount(status=str(status_value), count=int(count_value))
+        for status_value, count_value in result.all()
+    ]
+
+
+async def list_recent_failed_renders(
+    session: AsyncSession,
+    *,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[Render], int]:
+    """Return bounded failed renders ordered by newest update first."""
+    count_stmt = (
+        select(func.count())
+        .select_from(Render)
+        .where(Render.status == RenderStatus.FAILED.value)
+    )
+    count_result = await session.execute(count_stmt)
+    total = count_result.scalar_one()
+
+    query = (
+        select(Render)
+        .where(Render.status == RenderStatus.FAILED.value)
+        .order_by(col(Render.updated_at).desc(), col(Render.created_at).desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return list(result.scalars().all()), total
+
+
+async def count_renderer_failures(
+    session: AsyncSession,
+    *,
+    limit: int = 100,
+) -> list[RendererFailureCount]:
+    """Return failed render counts grouped by renderer and error code."""
+    result = await session.execute(
+        select(Render.renderer, Render.error_code, func.count())
+        .select_from(Render)
+        .where(Render.status == RenderStatus.FAILED.value)
+        .group_by(cast(Any, Render.renderer), cast(Any, Render.error_code))
+        .order_by(
+            func.count().desc(),
+            cast(Any, Render.renderer),
+            cast(Any, Render.error_code),
+        )
+        .limit(limit)
+    )
+    return [
+        RendererFailureCount(
+            renderer=str(renderer or "unknown"),
+            error_code=str(error_code or "UNKNOWN"),
+            count=int(count_value),
+        )
+        for renderer, error_code, count_value in result.all()
+    ]
+
+
+async def list_queue_wait_samples(
+    session: AsyncSession,
+    *,
+    limit: int = 100,
+) -> list[RenderTimingSample]:
+    """Return recent queue wait samples derived from started_at - created_at."""
+    result = await session.execute(
+        select(Render.id, Render.created_at, Render.started_at)
+        .where(col(Render.started_at).is_not(None))
+        .order_by(col(Render.started_at).desc())
+        .limit(limit)
+    )
+    samples: list[RenderTimingSample] = []
+    for render_id, created_at, started_at in result.all():
+        if started_at is None:
+            continue
+        seconds = max(0.0, (started_at - created_at).total_seconds())
+        samples.append(RenderTimingSample(render_id=str(render_id), seconds=seconds))
+    return samples
+
+
+async def list_render_duration_samples(
+    session: AsyncSession,
+    *,
+    limit: int = 100,
+) -> list[RenderTimingSample]:
+    """Return recent render duration samples derived from completed - started."""
+    result = await session.execute(
+        select(Render.id, Render.started_at, Render.completed_at)
+        .where(col(Render.started_at).is_not(None))
+        .where(col(Render.completed_at).is_not(None))
+        .order_by(col(Render.completed_at).desc())
+        .limit(limit)
+    )
+    samples: list[RenderTimingSample] = []
+    for render_id, started_at, completed_at in result.all():
+        if started_at is None or completed_at is None:
+            continue
+        seconds = max(0.0, (completed_at - started_at).total_seconds())
+        samples.append(RenderTimingSample(render_id=str(render_id), seconds=seconds))
+    return samples
+
+
+async def list_active_render_ids(session: AsyncSession) -> set[str]:
+    """Return render IDs that may still own active workspaces."""
+    active_statuses = [
+        RenderStatus.QUEUED.value,
+        RenderStatus.FETCHING.value,
+        RenderStatus.COMPILING.value,
+        RenderStatus.RENDERING.value,
+        RenderStatus.UPLOADING.value,
+    ]
+    result = await session.execute(
+        select(Render.id).where(col(Render.status).in_(active_statuses))
+    )
+    return {str(render_id) for render_id in result.scalars().all()}
+
+
+async def set_cancel_requested(
+    session: AsyncSession,
+    render_id: str,
+) -> Render | None:
+    """Set cancel_requested_at timestamp on a render.
+
+    Idempotent: if already set, preserves the original timestamp.
+    Returns None if render not found.
+    """
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    if render.cancel_requested_at is not None:
+        return render
+
+    render.cancel_requested_at = utcnow_naive()
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_progress(
+    session: AsyncSession,
+    render_id: str,
+    progress: int,
+) -> Render | None:
+    """Update the progress field on a render record.
+
+    Clamps progress to [0, 100]. Returns None if render not found.
+    """
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    clamped = max(0, min(100, progress))
+    render.progress = clamped
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_paths(
+    session: AsyncSession,
+    render_id: str,
+    *,
+    input_path: str | None = None,
+    expanded_path: str | None = None,
+    compiled_path: str | None = None,
+    output_path: str | None = None,
+    poster_path: str | None = None,
+    replay_path: str | None = None,
+    log_path: str | None = None,
+    renderer: str | None = None,
+) -> Render | None:
+    """Update artifact paths on a render record.
+
+    Only non-None values are updated; existing paths are preserved.
+    """
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    if input_path is not None:
+        render.input_path = input_path
+    if expanded_path is not None:
+        render.expanded_path = expanded_path
+    if compiled_path is not None:
+        render.compiled_path = compiled_path
+    if output_path is not None:
+        render.output_path = output_path
+    if poster_path is not None:
+        render.poster_path = poster_path
+    if replay_path is not None:
+        render.replay_path = replay_path
+    if log_path is not None:
+        render.log_path = log_path
+    if renderer is not None:
+        render.renderer = renderer
+
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_output_metadata(
+    session: AsyncSession,
+    render_id: str,
+    *,
+    metadata: StoredOutputMetadata,
+    output_path: str | None = None,
+) -> Render | None:
+    """Persist output artifact metadata on a render record atomically."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    if output_path is not None:
+        render.output_path = output_path
+    render.output_format = metadata.format.value
+    render.output_media_type = metadata.media_type
+    render.output_filename = metadata.filename
+    render.output_duration_seconds = metadata.duration_seconds
+    render.output_frame_count = metadata.frame_count
+    render.output_manifest_path = metadata.manifest_path
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def clear_render_output_metadata(
+    session: AsyncSession,
+    render_id: str,
+) -> Render | None:
+    """Clear output artifact metadata after a failed publish or finish step."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.output_format = None
+    render.output_media_type = None
+    render.output_filename = None
+    render.output_duration_seconds = None
+    render.output_frame_count = None
+    render.output_manifest_path = None
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_caption_metadata(
+    session: AsyncSession,
+    render_id: str,
+    *,
+    metadata: StoredCaptionMetadata,
+    sidecar_path: str | None = None,
+) -> Render | None:
+    """Persist caption metadata and sidecar URI on a render atomically."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.caption_mode = metadata.mode.value
+    render.caption_format = metadata.format.value if metadata.format else None
+    render.caption_sidecar_path = sidecar_path
+    render.caption_sidecar_media_type = metadata.sidecar_media_type
+    render.caption_sidecar_filename = metadata.sidecar_filename
+    render.caption_cue_count = metadata.cue_count
+    render.caption_burned_in = metadata.burned_in
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def clear_render_caption_metadata(
+    session: AsyncSession,
+    render_id: str,
+) -> Render | None:
+    """Clear caption metadata after a failed or captionless render stage."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.caption_mode = None
+    render.caption_format = None
+    render.caption_sidecar_path = None
+    render.caption_sidecar_media_type = None
+    render.caption_sidecar_filename = None
+    render.caption_cue_count = None
+    render.caption_burned_in = None
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_poster_metadata(
+    session: AsyncSession,
+    render_id: str,
+    *,
+    metadata: StoredPosterMetadata,
+    poster_path: str | None = None,
+) -> Render | None:
+    """Persist poster artifact metadata and URI on a render atomically."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.poster_path = poster_path
+    render.poster_mode = metadata.mode.value
+    render.poster_timestamp_seconds = metadata.timestamp_seconds
+    render.poster_media_type = metadata.media_type
+    render.poster_filename = metadata.filename
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def clear_render_poster_metadata(
+    session: AsyncSession,
+    render_id: str,
+) -> Render | None:
+    """Clear poster URI and metadata on disabled or failed poster generation."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.poster_path = None
+    render.poster_mode = None
+    render.poster_timestamp_seconds = None
+    render.poster_media_type = None
+    render.poster_filename = None
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render
+
+
+async def update_render_renderer(
+    session: AsyncSession,
+    render_id: str,
+    renderer: str,
+) -> Render | None:
+    """Persist the selected renderer on a render record."""
+    render = await get_render_by_id(session, render_id)
+    if render is None:
+        return None
+
+    render.renderer = renderer
+    render.updated_at = utcnow_naive()
+
+    session.add(render)
+    await _commit_and_refresh(session, render)
+    return render

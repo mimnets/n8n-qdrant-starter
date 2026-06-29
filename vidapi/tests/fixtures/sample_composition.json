@@ -1,0 +1,42 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://picsum.photos/1920/1080"
+            },
+            "start": 0.0,
+            "length": 3.0,
+            "fit": "cover"
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "text",
+              "text": "Hello VidAPI",
+              "font_size": 64,
+              "color": "#ffffff"
+            },
+            "start": 0.5,
+            "length": 2.0,
+            "position": "center"
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "quality": "medium"
+  }
+}

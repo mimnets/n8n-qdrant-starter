@@ -1,0 +1,62 @@
+# VPS production override.
+#
+# Keep VidAPI services off public host ports by default. The API should be
+# exposed later through Coolify/Traefik or a deliberate localhost-only binding.
+services:
+  api:
+    image: vidapi-api:local
+    ports: !reset []
+    expose:
+      - "8000"
+    networks:
+      - vidapi-prod
+      - coolify
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.constraint-label: traefik-public
+      traefik.http.middlewares.vidapi-api-gzip.compress: "true"
+      traefik.http.middlewares.vidapi-api-redirect.redirectscheme.scheme: https
+      traefik.http.middlewares.vidapi-api-security.headers.browserXssFilter: "true"
+      traefik.http.middlewares.vidapi-api-security.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.vidapi-api-security.headers.referrerPolicy: strict-origin-when-cross-origin
+      traefik.http.middlewares.vidapi-api-security.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.vidapi-api-security.headers.stsIncludeSubdomains: "true"
+      traefik.http.routers.vidapi-api-http.entrypoints: http
+      traefik.http.routers.vidapi-api-http.middlewares: vidapi-api-redirect
+      traefik.http.routers.vidapi-api-http.rule: Host(`vidapi.aiwithapex.com`)
+      traefik.http.routers.vidapi-api-https.entrypoints: https
+      traefik.http.routers.vidapi-api-https.middlewares: vidapi-api-gzip,vidapi-api-security
+      traefik.http.routers.vidapi-api-https.rule: Host(`vidapi.aiwithapex.com`)
+      traefik.http.routers.vidapi-api-https.tls: "true"
+      traefik.http.routers.vidapi-api-https.tls.certresolver: letsencrypt
+      traefik.http.services.vidapi-api.loadbalancer.server.port: "8000"
+
+  worker:
+    image: vidapi-worker:local
+
+  postgres:
+    networks:
+      vidapi-prod:
+        aliases:
+          - vidapi-postgres
+
+  redis:
+    networks:
+      vidapi-prod:
+        aliases:
+          - vidapi-redis
+
+  minio:
+    ports: !reset []
+    expose:
+      - "9000"
+      - "9001"
+    networks:
+      vidapi-prod:
+        aliases:
+          - vidapi-minio
+
+networks:
+  coolify:
+    external: true
