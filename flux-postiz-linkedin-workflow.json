@@ -1,0 +1,169 @@
+{
+  "name": "FLUX → Postiz → LinkedIn AI Post",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "prompt",
+              "value": "Professional abstract technology background with flowing data streams and geometric shapes, corporate style, 16:9 aspect ratio"
+            },
+            {
+              "name": "postContent",
+              "value": "AI isn't coming — it's already here, reshaping how we build, automate, and scale.\n\nAt Mimnets, we're using AI-powered automation to help businesses cut manual work and focus on what matters.\n\nWhat's one task you wish you could automate today?\n\n#AI #Automation #Productivity #Tech"
+            },
+            {
+              "name": "scheduleDate",
+              "value": "{{ $now.plus(1, 'hours').toUTC().format('yyyy-MM-dd[T]HH:mm:ss.SSS[Z]') }}"
+            }
+          ]
+        }
+      },
+      "id": "content-setup",
+      "name": "Content Setup",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"inputs\": \"{{ $json.prompt }}, high quality, corporate style, 1200x627\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HUGGINGFACE_TOKEN"
+            }
+          ]
+        }
+      },
+      "id": "huggingface-flux",
+      "name": "HuggingFace FLUX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_HF_CRED_ID",
+          "name": "HuggingFace API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://postiz:5000/public/v1/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "none",
+        "sendAsMultipart": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ $binary[\"data\"] }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "YOUR_POSTIZ_API_KEY"
+            }
+          ]
+        }
+      },
+      "id": "postiz-upload",
+      "name": "Upload Image to Postiz",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://postiz:5000/public/v1/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {},
+        "jsonBody": "{\n  \"type\": \"schedule\",\n  \"date\": \"{{ $json[\"scheduleDate\"] }}\",\n  \"shortLink\": false,\n  \"tags\": [],\n  \"posts\": [\n    {\n      \"integration\": {\n        \"id\": \"YOUR_LINKEDIN_INTEGRATION_ID\"\n      },\n      \"value\": [\n        {\n          \"content\": \"{{ $json[\"postContent\"] }}\",\n          \"image\": [\n            {\n              \"id\": \"{{ $node[\"Upload Image to Postiz\"].json[\"id\"] }}\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "YOUR_POSTIZ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "postiz-schedule",
+      "name": "Schedule LinkedIn Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Manual": {
+      "main": [
+        [{"node": "Content Setup", "type": "main", "index": 0}]
+      ]
+    },
+    "Content Setup": {
+      "main": [
+        [{"node": "HuggingFace FLUX", "type": "main", "index": 0}]
+      ]
+    },
+    "HuggingFace FLUX": {
+      "main": [
+        [{"node": "Upload Image to Postiz", "type": "main", "index": 0}]
+      ]
+    },
+    "Upload Image to Postiz": {
+      "main": [
+        [{"node": "Schedule LinkedIn Post", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+FROM ghcr.io/jo-inc/camofox-browser:latest
+
+# Install noVNC and x11vnc for VNC support (missing from the base image)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    novnc \
+    x11vnc \
+    && rm -rf /var/lib/apt/lists/*

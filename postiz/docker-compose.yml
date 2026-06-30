@@ -1,0 +1,242 @@
+# =============================================================================
+# Postiz — Self-hosted social media scheduler (Buffer/Hypefury alternative)
+# Supports 36+ platforms. Integrates with n8n via verified node + REST API.
+# Docs: https://docs.postiz.com
+# GitHub: https://github.com/gitroomhq/postiz-app
+# =============================================================================
+
+x-common: &common
+  restart: unless-stopped
+  networks:
+    - postiz-network
+    - temporal-network
+    - ai-starter     # <-- Same network as n8n, so Postiz API is reachable
+
+services:
+  # ===========================================================================
+  # Main Postiz App — NextJS + NestJS monolith
+  # Port 4007 → 5000 (internal). Access via nginx-proxy or direct.
+  # ===========================================================================
+  postiz:
+    <<: *common
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: postiz
+    ports:
+      - "4007:5000"
+    environment:
+      # === Required
+      MAIN_URL: 'https://postiz.mimnets.com'
+      FRONTEND_URL: 'https://postiz.mimnets.com'
+      NEXT_PUBLIC_BACKEND_URL: 'https://postiz.mimnets.com/api'
+      JWT_SECRET: '${POSTIZ_JWT_SECRET}'
+      DATABASE_URL: 'postgresql://${POSTIZ_DB_USER}:${POSTIZ_DB_PASSWORD}@postiz-postgres:5432/${POSTIZ_DB_NAME}'
+      REDIS_URL: 'redis://postiz-redis:6379'
+      BACKEND_INTERNAL_URL: 'http://localhost:3000'
+      TEMPORAL_ADDRESS: "temporal:7233"
+      IS_GENERAL: 'true'
+      DISABLE_REGISTRATION: '${POSTIZ_DISABLE_REGISTRATION:-false}'
+
+      # === Local storage (no Cloudflare needed to start)
+      STORAGE_PROVIDER: 'local'
+      UPLOAD_DIRECTORY: '/uploads'
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: '/uploads'
+
+      # === Social API keys (populate in .env when you add platforms)
+      X_URL: '${X_API_KEY:-}'
+      X_API_KEY: '${X_API_KEY:-}'
+      X_API_SECRET: '${X_API_SECRET:-}'
+      LINKEDIN_CLIENT_ID: '${LINKEDIN_CLIENT_ID:-}'
+      LINKEDIN_CLIENT_SECRET: '${LINKEDIN_CLIENT_SECRET:-}'
+      REDDIT_CLIENT_ID: '${REDDIT_CLIENT_ID:-}'
+      REDDIT_CLIENT_SECRET: '${REDDIT_CLIENT_SECRET:-}'
+      GITHUB_CLIENT_ID: '${GITHUB_CLIENT_ID:-}'
+      GITHUB_CLIENT_SECRET: '${GITHUB_CLIENT_SECRET:-}'
+      FACEBOOK_APP_ID: '${FACEBOOK_APP_ID:-}'
+      FACEBOOK_APP_SECRET: '${FACEBOOK_APP_SECRET:-}'
+      YOUTUBE_CLIENT_ID: '${YOUTUBE_CLIENT_ID:-}'
+      YOUTUBE_CLIENT_SECRET: '${YOUTUBE_CLIENT_SECRET:-}'
+      TIKTOK_CLIENT_ID: '${TIKTOK_CLIENT_ID:-}'
+      TIKTOK_CLIENT_SECRET: '${TIKTOK_CLIENT_SECRET:-}'
+      PINTEREST_CLIENT_ID: '${PINTEREST_CLIENT_ID:-}'
+      PINTEREST_CLIENT_SECRET: '${PINTEREST_CLIENT_SECRET:-}'
+      DISCORD_CLIENT_ID: '${DISCORD_CLIENT_ID:-}'
+      DISCORD_CLIENT_SECRET: '${DISCORD_CLIENT_SECRET:-}'
+      DISCORD_BOT_TOKEN_ID: '${DISCORD_BOT_TOKEN_ID:-}'
+      MASTODON_URL: '${MASTODON_URL:-https://mastodon.social}'
+      MASTODON_CLIENT_ID: '${MASTODON_CLIENT_ID:-}'
+      MASTODON_CLIENT_SECRET: '${MASTODON_CLIENT_SECRET:-}'
+      THREADS_APP_ID: '${THREADS_APP_ID:-}'
+      THREADS_APP_SECRET: '${THREADS_APP_SECRET:-}'
+
+      # === Misc
+      OPENAI_API_KEY: '${OPENAI_API_KEY:-}'
+      API_LIMIT: 30
+      FEE_AMOUNT: 0.05
+      NX_ADD_PLUGINS: false
+    volumes:
+      - postiz-config:/config/
+      - postiz-uploads:/uploads/
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+
+  # ===========================================================================
+  # PostgreSQL for Postiz (separate from n8n's Postgres)
+  # ===========================================================================
+  postiz-postgres:
+    <<: *common
+    image: postgres:17-alpine
+    container_name: postiz-postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD}
+      POSTGRES_USER: ${POSTIZ_DB_USER}
+      POSTGRES_DB: ${POSTIZ_DB_NAME}
+    volumes:
+      - postiz-postgres-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U ${POSTIZ_DB_USER} -d ${POSTIZ_DB_NAME}
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ===========================================================================
+  # Redis for Postiz (queues, caching)
+  # ===========================================================================
+  postiz-redis:
+    <<: *common
+    image: redis:7.2-alpine
+    container_name: postiz-redis
+    restart: always
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - postiz-redis-data:/data
+    networks:
+      - postiz-network
+
+  # ===========================================================================
+  # Temporal Stack — Required for scheduled publishing
+  # ===========================================================================
+  temporal-elasticsearch:
+    image: elasticsearch:7.17.27
+    container_name: temporal-elasticsearch
+    environment:
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.enabled=false
+    networks:
+      - temporal-network
+    expose:
+      - 9200
+    restart: unless-stopped
+
+  temporal-postgresql:
+    image: postgres:16-alpine
+    container_name: temporal-postgresql
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+    networks:
+      - temporal-network
+    expose:
+      - 5432
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    container_name: temporal
+    ports:
+      - '7233:7233'
+    depends_on:
+      - temporal-postgresql
+      - temporal-elasticsearch
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - ENABLE_ES=true
+      - ES_SEEDS=temporal-elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_NAMESPACE=default
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    working_dir: /etc/temporal
+    networks:
+      - temporal-network
+    restart: unless-stopped
+
+  temporal-admin-tools:
+    image: temporalio/admin-tools:1.28.1-tctl-1.18.4-cli-1.4.1
+    container_name: temporal-admin-tools
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    networks:
+      - temporal-network
+    stdin_open: true
+    depends_on:
+      - temporal
+    tty: true
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    container_name: temporal-ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    networks:
+      - temporal-network
+    ports:
+      - '8080:8080'
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Spotlight (optional — Sentry debug UI)
+  # ===========================================================================
+  spotlight:
+    image: ghcr.io/getsentry/spotlight:latest
+    container_name: postiz-spotlight
+    pull_policy: always
+    ports:
+      - '8969:8969/tcp'
+    networks:
+      - postiz-network
+    restart: unless-stopped
+
+# =============================================================================
+# Networks — postiz-network + temporal-network + ai-starter (shared with n8n)
+# =============================================================================
+networks:
+  postiz-network:
+    driver: bridge
+  temporal-network:
+    driver: bridge
+    name: temporal-network
+  ai-starter:
+    external: true
+    name: n8n-qdrant-starter_ai-starter
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postiz-postgres-volume:
+  postiz-redis-data:
+  postiz-config:
+  postiz-uploads:
