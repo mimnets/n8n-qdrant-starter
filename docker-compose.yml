@@ -69,28 +69,29 @@ services:
       retries: 5
 
   # =========================================================================
-  # Image Upload API — self-hosted imgbb replacement.
-  # n8n workflows: POST http://image-upload:8001/upload
+  # File Upload API — self-hosted file storage.
+  # Supports images, audio (mp3, wav, ogg, flac, etc.), video, documents, and archives.
+  # n8n workflows: POST http://file-upload:8001/upload
   # Host port 8010.
+  # Legacy /images/ endpoints still work for backward compatibility.
   # =========================================================================
-  image-upload:
+  file-upload:
     <<: *common
-    image: mimnets/n8n-image-upload:latest
-    # To build from local source instead, replace ↑ with ↓:
-    # build:
-    #   context: ./image-upload-server
-    #   dockerfile: Dockerfile
-    container_name: n8n-image-upload
+    build:
+      context: ./file-upload-server
+      dockerfile: Dockerfile
+    image: mimnets/n8n-file-upload:latest
+    container_name: n8n-file-upload
     ports:
       - "8010:8001"
     environment:
       - PORT=8001
       - UPLOAD_DIR=/app/uploads
       - UPLOAD_API_KEY=${UPLOAD_API_KEY:-}
-      - MAX_FILE_SIZE_MB=${UPLOAD_MAX_FILE_SIZE_MB:-10}
+      - MAX_FILE_SIZE_MB=${UPLOAD_MAX_FILE_SIZE_MB:-50}
       - BASE_URL=${UPLOAD_BASE_URL:-}
     volumes:
-      - image_uploads:/app/uploads
+      - file_uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 30s
@@ -135,5 +136,5 @@ volumes:
   postgres_storage:
   n8n_storage:
   qdrant_storage:
-  image_uploads:
+  file_uploads:
   seleniumbase_data:
