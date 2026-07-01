@@ -137,7 +137,6 @@ services:
     build:
       context: ./cutengine
       dockerfile: docker/Dockerfile
-    image: mimnets/cutengine:latest
     container_name: cutengine
     ports:
       - "3000:3000"

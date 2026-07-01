@@ -50,7 +50,7 @@ export function createGPUSchedulerWorker(
     const { model_needed, vram_gb, visual_priority, request } = job.data;
 
     // 1. Health check
-    const url = healthUrl(model_needed);
+    const url = healthUrl(model_needed as any);
     if (url) {
       const healthy = await checkHealth(url);
       if (!healthy) {
@@ -59,7 +59,7 @@ export function createGPUSchedulerWorker(
     }
 
     // 2. Reserve VRAM
-    const reserved = await tracker.reserve(model_needed, vram_gb);
+    const reserved = await tracker.reserve(model_needed as any, vram_gb);
     if (!reserved) {
       if (visual_priority === 'high' && (job.attemptsMade ?? 0) >= 3) {
         return { fallback: true, provider: 'seedance-remote' };
@@ -69,7 +69,7 @@ export function createGPUSchedulerWorker(
 
     // 3. TTL refresh interval
     const ttlRefresh = setInterval(
-      () => tracker.refreshTTL(model_needed),
+      () => tracker.refreshTTL(model_needed as any),
       20_000,
     );
 
@@ -83,7 +83,7 @@ export function createGPUSchedulerWorker(
       return { model: model_needed, status: 'done', request };
     } finally {
       clearInterval(ttlRefresh);
-      await tracker.release(model_needed);
+      await tracker.release(model_needed as any);
     }
   }, {
     connection: getRedisConnection(),

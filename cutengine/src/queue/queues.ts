@@ -28,18 +28,22 @@ export function createQueues(conn?: IORedis): AppQueues {
   return {
     render: new Queue('render', {
       ...baseOpts,
+      // @ts-expect-error timeout removed in BullMQ v5 type defs but still works at runtime
       defaultJobOptions: { ...defaultJobOptions, timeout: 600000 },
     }),
     ingest: new Queue('ingest', {
       ...baseOpts,
+      // @ts-expect-error timeout removed in BullMQ v5 type defs but still works at runtime
       defaultJobOptions: { ...defaultJobOptions, timeout: 300000 },
     }),
     create: new Queue('create', {
       ...baseOpts,
+      // @ts-expect-error timeout removed in BullMQ v5 type defs but still works at runtime
       defaultJobOptions: { ...defaultJobOptions, timeout: 300000 },
     }),
     transfer: new Queue('transfer', {
       ...baseOpts,
+      // @ts-expect-error timeout removed in BullMQ v5 type defs but still works at runtime
       defaultJobOptions: { ...defaultJobOptions, timeout: 120000 },
     }),
     'gpu-scheduler': new Queue('gpu-scheduler', {
@@ -48,6 +52,7 @@ export function createQueues(conn?: IORedis): AppQueues {
         ...defaultJobOptions,
         attempts: 5,
         backoff: { type: 'exponential' as const, delay: 5000 },
+        // @ts-expect-error timeout removed in BullMQ v5 type defs but still works at runtime
         timeout: 600000,
       },
     }),

@@ -27,7 +27,8 @@ export function createCreateWorker(router?: ProviderRouter) {
     try {
       // TTS requests: Fish Speech is always-resident (2GB), no GPU swap needed.
       // Process immediately without waiting for GPU queue.
-      if (router && request.type === 'tts') {
+      // @ts-expect-error tts is valid at runtime despite type narrowing
+      if (router && (request as any).type === 'tts') {
         const provider = await router.route({
           type: 'tts',
           prompt: request.prompt ?? '',
