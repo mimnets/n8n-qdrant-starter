@@ -1,1 +1,0 @@
-# Stealth browser automation service
