@@ -1,0 +1,32 @@
+{
+  "channel": "Beyond Orbit Space",
+  "topic": "The Andromeda Galaxy: Our Future Collision",
+  "scenes": [
+    {
+      "scene": 1,
+      "narration": "Two point five million light years away, the Andromeda Galaxy is hurtling toward us at 68 miles per second. In about 4.5 billion years, it will collide with our Milky Way, creating a spectacular cosmic merger.",
+      "image": "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&h=1080&fit=crop",
+      "effect": "zoomIn",
+      "duration": 8
+    },
+    {
+      "scene": 2,
+      "narration": "When galaxies collide, stars rarely hit each other. The spaces between them are so vast that most stars will simply pass through. But the gravitational dance will reshape both galaxies entirely.",
+      "image": "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&h=1080&fit=crop",
+      "effect": "slideLeft",
+      "duration": 8
+    },
+    {
+      "scene": 3,
+      "narration": "The result will be a giant elliptical galaxy, sometimes called Milkomeda. Our night sky will be transformed, filled with billions of new stars from a galaxy that was once just a faint smudge in the autumn sky.",
+      "image": "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=1920&h=1080&fit=crop",
+      "effect": "zoomOut",
+      "duration": 8
+    }
+  ],
+  "output": {
+    "format": "mp4",
+    "resolution": "hd",
+    "aspectRatio": "16:9"
+  }
+}

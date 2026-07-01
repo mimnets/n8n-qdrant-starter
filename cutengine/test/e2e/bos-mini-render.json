@@ -1,0 +1,70 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "soundtrack": {
+      "src": "http://localhost:3004/serve/v1/assets/tts/bgm_space.mp3",
+      "effect": "fadeInFadeOut",
+      "volume": 0.12
+    },
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Right now, inside your chest, there is iron. Not iron you ate, not iron from a pill \u2014 iron that was forged in the core of a dying star more than four billion years ago. That star had to violently dest</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 0,
+            "length": 27.245625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Every single heavy element in your body has a death certificate attached to it. The calcium in your bones \u2014 a supernova. The oxygen filling your lungs \u2014 a supernova. Even the gold in any jewelry you a</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 27.245625,
+            "length": 28.734625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_01.mp3"
+            },
+            "start": 0,
+            "length": 27.245625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_02.mp3"
+            },
+            "start": 27.245625,
+            "length": 28.734625
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "sd",
+    "aspectRatio": "16:9",
+    "fps": 25
+  }
+}

@@ -1,0 +1,718 @@
+{
+  "_comment": "프로젝트 파일 레지스트리. 파일 추가/삭제/이동 시 반드시 업데이트.",
+  "_generated": "2026-04-12T02:42:26Z",
+  "_status": "# TODO: REVIEW — 자동 스캔 결과. depends_on/depended_by는 수동 보강 필요.",
+  "_total_files": 142,
+  "files": {
+    "CHANGELOG.md": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docker/docker-compose.dev.yml": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docker/docker-compose.gpu.yml": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docker/docker-compose.runpod.yml": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docker/docker-compose.yml": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docker/hunyuan/server.py": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docs/superpowers/plans/2026-03-29-cutengine-plan.md": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docs/superpowers/specs/2026-03-29-cutengine-design.md": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "docs/superpowers/specs/2026-03-31-health-check-design.md": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "GSTACK_MISSION.md": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "package.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "pnpm-lock.yaml": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "README.md": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "scripts/download-models.sh": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "setup.sh": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": ""
+    },
+    "src/api/create/generate.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/edit/inspect.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/edit/render.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/edit/templates.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/extended/batch.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/extended/ecosystem.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/extended/preview.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/extended/queue-status.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/health.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/ingest/sources.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/ingest/upload.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/metrics.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/middleware/auth.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/progress.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/api/serve/assets.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/asset/destinations/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/asset/inspect.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/asset/storage/local.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/asset/storage/s3.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/config/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/config/logger.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/gpu/memory-manager.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/cubeinsight.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/flux-klein.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/hunyuan-local.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/profilecore.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/realesrgan.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/router.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/seedance-remote.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/providers/voicecore-tts.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/create/qc/pipeline.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/db/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/db/schema.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/gpu/priority-calculator.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/gpu/scheduler-worker.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/gpu/types.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/gpu/vram-budget-tracker.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/queue/connection.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/queue/queues.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/queue/workers/create-worker.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/queue/workers/ingest-worker.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/queue/workers/render-worker.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/ai.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/audio.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/html.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/image.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/luma.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/richtext.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/shape.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/svg.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/text.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/title.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/assets/video.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/builder/html-template.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->- (HEAD -> main)"
+    },
+    "src/render/builder/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/capture/browser-pool.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/capture/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/chromakey.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/filters.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/kenburns.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/speed.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/transform.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/transitions.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/effects/tween.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/encoder/audio-mixer.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/encoder/hwaccel.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/encoder/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/parser/index.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/parser/resolve-output.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/parser/resolve-timing.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/parser/types.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/pipeline.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/render/prefetch.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/server.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/shared/health.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/template/crud.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/template/merge.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "src/types/fastify.d.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "test/e2e/bos-batch-1.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": ""
+    },
+    "test/e2e/bos-batch-2.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": ""
+    },
+    "test/e2e/bos-batch-3.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": ""
+    },
+    "test/e2e/bos-full-render.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": ""
+    },
+    "test/e2e/bos-mini-render.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": ""
+    },
+    "test/e2e/bos-render-request.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "test/e2e/bos-render-with-tts.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->- (origin/main, origin/HEAD)"
+    },
+    "test/e2e/bos-test-script.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "test/e2e/run-e2e.sh": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/create/create.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/edit/render.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/edit/templates.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/extended/extended.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/health.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/ingest/ingest.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/metrics.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/middleware/auth.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/progress.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/api/serve/serve.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/asset/inspect.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/compatibility/shotstack-compat.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/create/ecosystem.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/create/visualcore.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/create/voicecore-tts.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/db/schema.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/e2e/fixtures/qc-result.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/e2e/fixtures/script.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/e2e/fixtures/topic.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/e2e/helpers/pipeline-runner.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/e2e/helpers/types.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/e2e/pipeline.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/gpu/priority-calculator.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/gpu/vram-budget-tracker.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/queue/queues.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/queue/workers/callback.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/assets/remaining-assets.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/assets/video-audio.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/builder/builder.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/capture/capture.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/effects/effects-full.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/encoder/encoder.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/parser/parser.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/pipeline.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/prefetch.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tests/render/render-worker.test.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "tsconfig.json": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    },
+    "vitest.config.ts": {
+      "depends_on": [],
+      "depended_by": [],
+      "last_modified": "%Y->-"
+    }
+  }
+}

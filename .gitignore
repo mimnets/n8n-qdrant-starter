@@ -18,7 +18,8 @@ browser_profile/
 stealth-browser/profiles/
 stealth-browser/cookies/
 
-# Image uploads
+# Uploads
+file_uploads/
 image_uploads/
 
 # n8n data
@@ -33,8 +34,8 @@ qdrant_storage/
 # Backups
 backups/
 
-# VidAPI data (rendered videos, DB, assets)
-vidapi/data/
+# CutEngine data (rendered videos, DB, assets)
+cutengine/data/
 
 # OS files
 .DS_Store

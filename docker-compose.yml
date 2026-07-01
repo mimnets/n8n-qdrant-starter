@@ -70,10 +70,9 @@ services:
 
   # =========================================================================
   # File Upload API — self-hosted file storage.
-  # Supports images, audio (mp3, wav, ogg, flac, etc.), video, documents, and archives.
+  # Supports images, audio (mp3, wav, ogg, flac, etc.), video, documents.
   # n8n workflows: POST http://file-upload:8001/upload
   # Host port 8010.
-  # Legacy /images/ endpoints still work for backward compatibility.
   # =========================================================================
   file-upload:
     <<: *common
@@ -99,34 +98,89 @@ services:
       retries: 3
 
   # =========================================================================
-  # SeleniumBase Stealth Browser — replaces Camoufox.
-  # SeleniumBase CDP Mode passes every bot-detection test (BrowserScan,
-  # Cloudflare, hCaptcha). REST API: navigate, click, type, screenshot,
-  # scrape, JS execution. Drop-in compatible with Camoufox API.
-  # n8n workflows: http://seleniumbase:9377/navigate
+  # CutEngine — Self-hosted Shotstack-compatible video render engine.
+  # Ken Burns zoom effects (zoomIn/zoomOut/slideLeft/slideRight),
+  # 20+ transitions, captions, text overlays, multi-track audio.
+  # n8n workflows: POST http://cutengine:3000/edit/v1/render
+  # Host port 3000.
+  # Source: https://github.com/jjjames38/cutengine
   # =========================================================================
-  seleniumbase:
+  cutengine-redis:
     <<: *common
-    build:
-      context: ./seleniumbase
-      dockerfile: Dockerfile
-    container_name: seleniumbase
-    ports:
-      - "9377:9377"   # SeleniumBase REST API (same port, drop-in replacement)
-    environment:
-      - SELENIUMBASE_PORT=9377
-      - SELENIUMBASE_API_KEY=${SELENIUMBASE_API_KEY:-}
-      - HEADLESS=true
-      - DISPLAY=:99
+    image: redis:7-alpine
+    container_name: cutengine-redis
     volumes:
-      - seleniumbase_data:/app/data
-    shm_size: '2gb'
+      - cutengine_redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9377/health || exit 1"]
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
+
+  cutengine-chromium:
+    <<: *common
+    image: browserless/chrome:latest
+    container_name: cutengine-chromium
+    environment:
+      - MAX_CONCURRENT_SESSIONS=4
+      - CONNECTION_TIMEOUT=3600000
+    healthcheck:
+      test: ["CMD", "node", "/home/browserless/healthcheck.js"]
       interval: 30s
       timeout: 10s
+      start_period: 30s
       retries: 5
+
+  cutengine:
+    <<: *common
+    build:
+      context: ./cutengine
+      dockerfile: docker/Dockerfile
+    image: mimnets/cutengine:latest
+    container_name: cutengine
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_URL=redis://cutengine-redis:6379
+      - CHROMIUM_WS=ws://cutengine-chromium:3000
+      - STORAGE_DRIVER=local
+      - STORAGE_PATH=/data/assets
+      - PORT=3000
+    volumes:
+      - cutengine_assets:/data/assets
+      - cutengine_db:/data
+    depends_on:
+      cutengine-redis:
+        condition: service_healthy
+      cutengine-chromium:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
       start_period: 60s
+      retries: 5
+
+  # =========================================================================
+  # Kokoro TTS — text-to-speech (OpenAI-compatible API, 35+ voices).
+  # n8n workflows: POST http://kokoro-tts:8880/v1/audio/speech
+  # Host port 8880.
+  # =========================================================================
+  kokoro-tts:
+    <<: *common
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: kokoro-tts
+    ports:
+      - "8880:8880"
+    environment:
+      - KOKORO_API_KEY=${KOKORO_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/v1/audio/voices"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
 
 networks:
   ai-starter:
@@ -137,4 +191,6 @@ volumes:
   n8n_storage:
   qdrant_storage:
   file_uploads:
-  seleniumbase_data:
+  cutengine_assets:
+  cutengine_db:
+  cutengine_redis_data:

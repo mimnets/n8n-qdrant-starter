@@ -1,0 +1,52 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&h=1080&fit=crop"
+            },
+            "start": 0,
+            "length": 8,
+            "effect": "zoomIn",
+            "transition": {
+              "in": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&h=1080&fit=crop"
+            },
+            "start": 8,
+            "length": 8,
+            "effect": "slideLeft",
+            "transition": {
+              "in": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=1920&h=1080&fit=crop"
+            },
+            "start": 16,
+            "length": 8,
+            "effect": "zoomOut",
+            "transition": {
+              "in": "fade"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "hd",
+    "aspectRatio": "16:9"
+  }
+}

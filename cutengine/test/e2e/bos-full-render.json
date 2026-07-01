@@ -1,0 +1,422 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "soundtrack": {
+      "src": "http://localhost:3004/serve/v1/assets/tts/bgm_space.mp3",
+      "effect": "fadeInFadeOut",
+      "volume": 0.12
+    },
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Right now, inside your chest, there is iron. Not iron you ate, not iron from a pill \u2014 iron that was forged in the core of a dying star more than four billion years ago. That star had to violently dest</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 0,
+            "length": 27.245625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Every single heavy element in your body has a death certificate attached to it. The calcium in your bones \u2014 a supernova. The oxygen filling your lungs \u2014 a supernova. Even the gold in any jewelry you a</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 27.245625,
+            "length": 28.734625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a1a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">To understand how a star builds you, you have to start at the beginning \u2014 when stars themselves are born. Deep inside nebulae, clouds of hydrogen gas stretching across hundreds of light-years begin to</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 55.98025,
+            "length": 34.037438,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#2e0a1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The sun you see every day is a medium-sized star. Comfortable. Stable. It fuses hydrogen and will keep doing so for another five billion years. But imagine a star born with twenty, fifty, even one hun</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 90.01768799999999,
+            "length": 36.205625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a2e1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Inside a massive star, nuclear fusion happens in layers. The star starts with hydrogen \u2014 fusing it into helium. When hydrogen runs out in the core, it starts fusing helium into carbon. Then carbon int</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 126.22331299999999,
+            "length": 40.202375,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a1a3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">That element is iron. And here is where physics becomes a death sentence for the star. Every element up to iron releases energy when it fuses. But iron is different. Iron absorbs energy instead of rel</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 166.42568799999998,
+            "length": 36.597438,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0e0e3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The iron core keeps growing until it reaches approximately one and four tenths times the mass of our entire sun. At that exact threshold \u2014 called the Chandrasekhar limit \u2014 something in the physics of </p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 203.023126,
+            "length": 40.07175,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#2e1a0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Here is the part that overturns every intuition. The supernova \u2014 the explosion that scatters all those elements into space \u2014 is not powered by the star blowing up outward. It is powered by the core bo</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 243.094876,
+            "length": 50.2595,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a2e2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The neutrino flood from a single supernova carries more energy than our sun will emit across its entire ten-billion-year lifetime \u2014 and it releases all of it in about ten seconds. During SN 1987A, the</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 293.354376,
+            "length": 42.997438,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#3e0a0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">When the shockwave tears through the outer layers of the dying star, it does something chemically extraordinary. The intense heat and pressure synthesize elements that did not exist in the star before</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 336.351814,
+            "length": 41.978688,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a0a3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">But here is where it gets strange. The supernova that contributed the iron in your blood did not happen just once. It happened repeatedly, across multiple generations of stars, over billions of years.</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 378.33050199999997,
+            "length": 41.377875,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a3e1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Astronomers can read this history directly from starlight. When light passes through a star or nebula, each element absorbs specific wavelengths, leaving dark lines in the spectrum called absorption l</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 419.708377,
+            "length": 38.79175,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#3e1a0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Now consider what this means for everything alive. Every organism on Earth \u2014 every bacterium, every whale, every tree \u2014 is built from the same pool of recycled stellar material. Life did not invent ch</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 458.50012699999996,
+            "length": 40.489688,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a0a3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">And here is the fact that should stop you completely. The star that forged most of the iron in your body no longer exists. It burned, collapsed, and exploded before our solar system even formed. Its i</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 498.98981499999996,
+            "length": 47.020313,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#2e0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The next generation of supernovae is coming. Betelgeuse, the red shoulder of Orion that you can see on any clear winter night, is in the final phase of its life. It has already depleted its hydrogen a</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 546.010128,
+            "length": 38.79175,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a2e0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">And here is the thought that reframes everything you know about yourself. When Betelgeuse finally goes, it will forge new iron, new gold, new calcium \u2014 and scatter it into the galaxy. Some of that mat</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 584.801878,
+            "length": 41.116625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#3e0a1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">You have just traced the complete arc \u2014 from a hydrogen cloud billions of years ago, through a stellar core burning at billions of degrees, through a detonation releasing the energy of ten octillion n</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 625.918503,
+            "length": 38.47825,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a3e0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Drop your answer in the comments \u2014 if you could watch any star in the current night sky go supernova, which one would you choose, and what do you think would be different about the elements it forges?</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 664.396753,
+            "length": 36.33625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_01.mp3"
+            },
+            "start": 0,
+            "length": 27.245625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_02.mp3"
+            },
+            "start": 27.245625,
+            "length": 28.734625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_03.mp3"
+            },
+            "start": 55.98025,
+            "length": 34.037438
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_04.mp3"
+            },
+            "start": 90.01768799999999,
+            "length": 36.205625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_05.mp3"
+            },
+            "start": 126.22331299999999,
+            "length": 40.202375
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_06.mp3"
+            },
+            "start": 166.42568799999998,
+            "length": 36.597438
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_07.mp3"
+            },
+            "start": 203.023126,
+            "length": 40.07175
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_08.mp3"
+            },
+            "start": 243.094876,
+            "length": 50.2595
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_09.mp3"
+            },
+            "start": 293.354376,
+            "length": 42.997438
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_10.mp3"
+            },
+            "start": 336.351814,
+            "length": 41.978688
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_11.mp3"
+            },
+            "start": 378.33050199999997,
+            "length": 41.377875
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_12.mp3"
+            },
+            "start": 419.708377,
+            "length": 38.79175
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_13.mp3"
+            },
+            "start": 458.50012699999996,
+            "length": 40.489688
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_14.mp3"
+            },
+            "start": 498.98981499999996,
+            "length": 47.020313
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_15.mp3"
+            },
+            "start": 546.010128,
+            "length": 38.79175
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_16.mp3"
+            },
+            "start": 584.801878,
+            "length": 41.116625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_17.mp3"
+            },
+            "start": 625.918503,
+            "length": 38.47825
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_18.mp3"
+            },
+            "start": 664.396753,
+            "length": 36.33625
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "sd",
+    "aspectRatio": "16:9",
+    "fps": 25
+  }
+}

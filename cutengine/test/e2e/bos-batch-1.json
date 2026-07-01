@@ -1,0 +1,158 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "soundtrack": {
+      "src": "http://localhost:3004/serve/v1/assets/tts/bgm_space.mp3",
+      "effect": "fadeInFadeOut",
+      "volume": 0.12
+    },
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Right now, inside your chest, there is iron. Not iron you ate, not iron from a pill \u2014 iron that was forged in the core of a dying star more than four billion years ago. That star had to violently dest</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 0,
+            "length": 27.245625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Every single heavy element in your body has a death certificate attached to it. The calcium in your bones \u2014 a supernova. The oxygen filling your lungs \u2014 a supernova. Even the gold in any jewelry you a</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 27.245625,
+            "length": 28.734625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a1a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">To understand how a star builds you, you have to start at the beginning \u2014 when stars themselves are born. Deep inside nebulae, clouds of hydrogen gas stretching across hundreds of light-years begin to</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 55.98025,
+            "length": 34.037438,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#2e0a1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The sun you see every day is a medium-sized star. Comfortable. Stable. It fuses hydrogen and will keep doing so for another five billion years. But imagine a star born with twenty, fifty, even one hun</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 90.01768799999999,
+            "length": 36.205625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a2e1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Inside a massive star, nuclear fusion happens in layers. The star starts with hydrogen \u2014 fusing it into helium. When hydrogen runs out in the core, it starts fusing helium into carbon. Then carbon int</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 126.22331299999999,
+            "length": 40.202375,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a1a3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">That element is iron. And here is where physics becomes a death sentence for the star. Every element up to iron releases energy when it fuses. But iron is different. Iron absorbs energy instead of rel</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 166.42568799999998,
+            "length": 36.597438,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_01.mp3"
+            },
+            "start": 0,
+            "length": 27.245625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_02.mp3"
+            },
+            "start": 27.245625,
+            "length": 28.734625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_03.mp3"
+            },
+            "start": 55.98025,
+            "length": 34.037438
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_04.mp3"
+            },
+            "start": 90.01768799999999,
+            "length": 36.205625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_05.mp3"
+            },
+            "start": 126.22331299999999,
+            "length": 40.202375
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_06.mp3"
+            },
+            "start": 166.42568799999998,
+            "length": 36.597438
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "sd",
+    "aspectRatio": "16:9",
+    "fps": 25
+  }
+}

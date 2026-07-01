@@ -1,0 +1,10 @@
+{
+  "_comment": "현재 진행 중인 작업. 매 세션 시작/종료 시 업데이트.",
+  "task": "",
+  "status": "not_started",
+  "started_at": "",
+  "last_session": "",
+  "next_steps": [],
+  "blockers": [],
+  "files_modified": []
+}

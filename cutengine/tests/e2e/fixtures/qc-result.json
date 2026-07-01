@@ -1,0 +1,12 @@
+{
+  "pass": true,
+  "scores": {
+    "clip_score": 0.85,
+    "aesthetic_score": 7.2,
+    "nsfw_score": 0.01,
+    "temporal_consistency": 0.92,
+    "motion_detected": true
+  },
+  "issues": [],
+  "attempt": 1
+}

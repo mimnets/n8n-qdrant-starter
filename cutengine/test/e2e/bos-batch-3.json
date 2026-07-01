@@ -1,0 +1,158 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "soundtrack": {
+      "src": "http://localhost:3004/serve/v1/assets/tts/bgm_space.mp3",
+      "effect": "fadeInFadeOut",
+      "volume": 0.12
+    },
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#3e1a0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Now consider what this means for everything alive. Every organism on Earth \u2014 every bacterium, every whale, every tree \u2014 is built from the same pool of recycled stellar material. Life did not invent ch</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 0.0,
+            "length": 40.489688,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a0a3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">And here is the fact that should stop you completely. The star that forged most of the iron in your body no longer exists. It burned, collapsed, and exploded before our solar system even formed. Its i</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 40.489688,
+            "length": 47.020313,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#2e0a2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The next generation of supernovae is coming. Betelgeuse, the red shoulder of Orion that you can see on any clear winter night, is in the final phase of its life. It has already depleted its hydrogen a</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 87.51000100000005,
+            "length": 38.79175,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a2e0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">And here is the thought that reframes everything you know about yourself. When Betelgeuse finally goes, it will forge new iron, new gold, new calcium \u2014 and scatter it into the galaxy. Some of that mat</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 126.30175100000002,
+            "length": 41.116625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#3e0a1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">You have just traced the complete arc \u2014 from a hydrogen cloud billions of years ago, through a stellar core burning at billions of degrees, through a detonation releasing the energy of ten octillion n</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 167.41837600000002,
+            "length": 38.47825,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a3e0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Drop your answer in the comments \u2014 if you could watch any star in the current night sky go supernova, which one would you choose, and what do you think would be different about the elements it forges?</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 205.89662600000003,
+            "length": 36.33625,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_13.mp3"
+            },
+            "start": 0.0,
+            "length": 40.489688
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_14.mp3"
+            },
+            "start": 40.489688,
+            "length": 47.020313
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_15.mp3"
+            },
+            "start": 87.51000100000005,
+            "length": 38.79175
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_16.mp3"
+            },
+            "start": 126.30175100000002,
+            "length": 41.116625
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_17.mp3"
+            },
+            "start": 167.41837600000002,
+            "length": 38.47825
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_18.mp3"
+            },
+            "start": 205.89662600000003,
+            "length": 36.33625
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "sd",
+    "aspectRatio": "16:9",
+    "fps": 25
+  }
+}

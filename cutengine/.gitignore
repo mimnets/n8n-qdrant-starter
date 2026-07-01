@@ -1,0 +1,10 @@
+node_modules/
+dist/
+data/
+.env
+*.db
+.superpowers/
+.gstack/
+beyond-orbit-automation/
+test/e2e/output/
+.DS_Store

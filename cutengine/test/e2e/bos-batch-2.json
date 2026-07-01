@@ -1,0 +1,158 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "soundtrack": {
+      "src": "http://localhost:3004/serve/v1/assets/tts/bgm_space.mp3",
+      "effect": "fadeInFadeOut",
+      "volume": 0.12
+    },
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0e0e3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The iron core keeps growing until it reaches approximately one and four tenths times the mass of our entire sun. At that exact threshold \u2014 called the Chandrasekhar limit \u2014 something in the physics of </p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 0.0,
+            "length": 40.07175,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#2e1a0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Here is the part that overturns every intuition. The supernova \u2014 the explosion that scatters all those elements into space \u2014 is not powered by the star blowing up outward. It is powered by the core bo</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 40.07175000000001,
+            "length": 50.2595,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a2e2e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">The neutrino flood from a single supernova carries more energy than our sun will emit across its entire ten-billion-year lifetime \u2014 and it releases all of it in about ten seconds. During SN 1987A, the</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 90.33125000000001,
+            "length": 42.997438,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#3e0a0a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">When the shockwave tears through the outer layers of the dying star, it does something chemically extraordinary. The intense heat and pressure synthesize elements that did not exist in the star before</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 133.328688,
+            "length": 41.978688,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#1a0a3e;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">But here is where it gets strange. The supernova that contributed the iron in your blood did not happen just once. It happened repeatedly, across multiple generations of stars, over billions of years.</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 175.30737599999998,
+            "length": 41.377875,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "html",
+              "html": "<div style=\"width:1920px;height:1080px;background:#0a3e1a;display:flex;align-items:center;justify-content:center;padding:100px;\">\n                <p style=\"color:white;font-size:48px;text-align:center;font-family:sans-serif;line-height:1.4;max-width:1400px;\">Astronomers can read this history directly from starlight. When light passes through a star or nebula, each element absorbs specific wavelengths, leaving dark lines in the spectrum called absorption l</p>\n            </div>",
+              "width": 1920,
+              "height": 1080
+            },
+            "start": 216.685251,
+            "length": 38.79175,
+            "transition": {
+              "in": "fade",
+              "out": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_07.mp3"
+            },
+            "start": 0.0,
+            "length": 40.07175
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_08.mp3"
+            },
+            "start": 40.07175000000001,
+            "length": 50.2595
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_09.mp3"
+            },
+            "start": 90.33125000000001,
+            "length": 42.997438
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_10.mp3"
+            },
+            "start": 133.328688,
+            "length": 41.978688
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_11.mp3"
+            },
+            "start": 175.30737599999998,
+            "length": 41.377875
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://localhost:3004/serve/v1/assets/tts/scene_12.mp3"
+            },
+            "start": 216.685251,
+            "length": 38.79175
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "sd",
+    "aspectRatio": "16:9",
+    "fps": 25
+  }
+}

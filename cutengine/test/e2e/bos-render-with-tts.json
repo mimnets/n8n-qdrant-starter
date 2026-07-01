@@ -1,0 +1,85 @@
+{
+  "timeline": {
+    "background": "#000000",
+    "soundtrack": {
+      "src": "https://cdn.pixabay.com/audio/2024/11/29/audio_e4a2bd3ed8.mp3",
+      "effect": "fadeInFadeOut",
+      "volume": 0.15
+    },
+    "tracks": [
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&h=1080&fit=crop"
+            },
+            "start": 0,
+            "length": 14,
+            "effect": "zoomIn",
+            "transition": {
+              "in": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&h=1080&fit=crop"
+            },
+            "start": 14,
+            "length": 11,
+            "effect": "slideLeft",
+            "transition": {
+              "in": "fade"
+            }
+          },
+          {
+            "asset": {
+              "type": "image",
+              "src": "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=1920&h=1080&fit=crop"
+            },
+            "start": 25,
+            "length": 13,
+            "effect": "zoomOut",
+            "transition": {
+              "in": "fade"
+            }
+          }
+        ]
+      },
+      {
+        "clips": [
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://host.docker.internal:3002/serve/v1/assets/tts/scene1.mp3"
+            },
+            "start": 0,
+            "length": 14
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://host.docker.internal:3002/serve/v1/assets/tts/scene2.mp3"
+            },
+            "start": 14,
+            "length": 11
+          },
+          {
+            "asset": {
+              "type": "audio",
+              "src": "http://host.docker.internal:3002/serve/v1/assets/tts/scene3.mp3"
+            },
+            "start": 25,
+            "length": 13
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "format": "mp4",
+    "resolution": "hd",
+    "aspectRatio": "16:9"
+  }
+}
