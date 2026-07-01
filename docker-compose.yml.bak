@@ -1,0 +1,140 @@
+x-common: &common
+  restart: unless-stopped
+  networks:
+    - ai-starter
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: ${POSTGRES_USER:-n8n}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_to_secure_password}
+  POSTGRES_DB: ${POSTGRES_DB:-n8n}
+
+services:
+  postgres:
+    <<: *common
+    image: postgres:16-alpine
+    container_name: n8n-postgres
+    environment:
+      <<: *postgres-env
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    <<: *common
+    image: qdrant/qdrant:latest
+    container_name: n8n-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  n8n:
+    <<: *common
+    image: n8nio/n8n:latest
+    container_name: n8n
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    ports:
+      - "5678:5678"
+    environment:
+      - TZ=Asia/Dhaka
+      - GENERIC_TIMEZONE=Asia/Dhaka
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-n8n}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-change_me_to_secure_password}
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-n8n}
+      - N8N_SECURE_COOKIE=false
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
+      - N8N_RESTRICT_FILE_ACCESS_TO=false
+      - N8N_TRUST_PROXY=true
+      - N8N_URL=https://n8n.mimnets.com
+      - WEBHOOK_URL=https://n8n.mimnets.com
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ./scripts/n8n-entrypoint.sh:/entrypoint.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:5678/healthz || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # =========================================================================
+  # File Upload API — self-hosted file storage.
+  # Supports images, audio (mp3, wav, ogg, flac, etc.), video, documents, and archives.
+  # n8n workflows: POST http://file-upload:8001/upload
+  # Host port 8010.
+  # Legacy /images/ endpoints still work for backward compatibility.
+  # =========================================================================
+  file-upload:
+    <<: *common
+    build:
+      context: ./file-upload-server
+      dockerfile: Dockerfile
+    image: mimnets/n8n-file-upload:latest
+    container_name: n8n-file-upload
+    ports:
+      - "8010:8001"
+    environment:
+      - PORT=8001
+      - UPLOAD_DIR=/app/uploads
+      - UPLOAD_API_KEY=${UPLOAD_API_KEY:-}
+      - MAX_FILE_SIZE_MB=${UPLOAD_MAX_FILE_SIZE_MB:-50}
+      - BASE_URL=${UPLOAD_BASE_URL:-}
+    volumes:
+      - file_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================================================================
+  # SeleniumBase Stealth Browser — replaces Camoufox.
+  # SeleniumBase CDP Mode passes every bot-detection test (BrowserScan,
+  # Cloudflare, hCaptcha). REST API: navigate, click, type, screenshot,
+  # scrape, JS execution. Drop-in compatible with Camoufox API.
+  # n8n workflows: http://seleniumbase:9377/navigate
+  # =========================================================================
+  seleniumbase:
+    <<: *common
+    build:
+      context: ./seleniumbase
+      dockerfile: Dockerfile
+    container_name: seleniumbase
+    ports:
+      - "9377:9377"   # SeleniumBase REST API (same port, drop-in replacement)
+    environment:
+      - SELENIUMBASE_PORT=9377
+      - SELENIUMBASE_API_KEY=${SELENIUMBASE_API_KEY:-}
+      - HEADLESS=true
+      - DISPLAY=:99
+    volumes:
+      - seleniumbase_data:/app/data
+    shm_size: '2gb'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9377/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+networks:
+  ai-starter:
+    driver: bridge
+
+volumes:
+  postgres_storage:
+  n8n_storage:
+  qdrant_storage:
+  file_uploads:
+  seleniumbase_data:
