@@ -135,12 +135,15 @@ app.post("/edit/v1/render", async (req, res) => {
         composition.width = width;
         composition.height = height;
 
+        const crfValue = 22; // lower = better quality (18-28 range)
         await renderMedia({
           composition,
           serveUrl: bundle,
           codec: "h264",
           outputLocation: outputPath,
           inputProps,
+          crf: crfValue,
+          videoBitrate: "3M",
           chromiumOptions: {
             enableMultiProcessOnLinux: true,
           },
