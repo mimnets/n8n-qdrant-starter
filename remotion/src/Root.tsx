@@ -1,9 +1,7 @@
-import { Composition } from "remotion";
+import { registerRoot, Composition } from "remotion";
 import { VideoComposition } from "./compositions/VideoComposition";
 
-// Default composition for Remotion Studio preview.
-// The actual API server creates compositions dynamically.
-export const RemotionRoot: React.FC = () => {
+const RemotionRoot: React.FC = () => {
   return (
     <>
       <Composition
@@ -55,3 +53,5 @@ export const RemotionRoot: React.FC = () => {
     </>
   );
 };
+
+registerRoot(RemotionRoot);
