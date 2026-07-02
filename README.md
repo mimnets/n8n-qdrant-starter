@@ -14,7 +14,7 @@ A lightweight, self-hosted stack combining:
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
 - **[File Upload API](https://hub.docker.com/r/mimnets/n8n-file-upload)** — self-hosted file storage for images, audio, video, documents
-- **[CutEngine](https://github.com/jjjames38/cutengine)** — self-hosted Shotstack-compatible video render engine with Ken Burns zoom effects, transitions, captions, and multi-track audio (async, queue-based)
+- **[Remotion](https://remotion.dev)** — programmatic video render engine (React-based) with Ken Burns zoom, transitions, captions, multi-track audio, and HTML scenes
 - **[Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI)** — text-to-speech with 35+ voices (OpenAI-compatible API)
 
 ## 🏗️ Architecture
@@ -29,7 +29,7 @@ A lightweight, self-hosted stack combining:
               ┌─────────────┼──────────────────┐
               │             │                  │
     ┌─────────┴────┐  ┌────┴──────────┐       │
-    │ File Upload  │  │   CutEngine   │       │
+    │ File Upload  │  │   Remotion    │       │
     │ (REST, 8010) │  │ (REST, 3000)  │       │
     │  file store  │  │ Ken Burns +   │       │
     └──────────────┘  │  Captions     │       │
@@ -41,11 +41,6 @@ A lightweight, self-hosted stack combining:
                               │         │ TTS/Speech │
                               │         │ 35+ voices │
                               │         └────────────┘
-                              ▼
-                     ┌────────────────┐     ┌──────────────────┐
-                     │    Redis       │◄────│   Chromium       │
-                     │  (BullMQ)      │     │  (Puppeteer)     │
-                     └────────────────┘     └──────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -61,7 +56,7 @@ cp .env.example .env
 # 3. Edit .env — add your API keys
 nano .env
 
-# 4. Start everything (builds CutEngine from local source)
+# 4. Start everything (builds Remotion + file-upload from local source)
 docker compose up -d
 
 # 5. Check all services are healthy
@@ -74,8 +69,8 @@ docker compose ps
 | **Qdrant Dashboard** | `http://localhost:6333/dashboard` |
 | **File Upload API** | `http://localhost:8010` |
 | **File Upload Admin** | `http://localhost:8010/admin` |
-| **CutEngine API** | `http://localhost:3000` |
-| **CutEngine Health** | `http://localhost:3000/health` |
+| **Remotion API** | `http://localhost:3000` |
+| **Remotion Health** | `http://localhost:3000/health` |
 | **Kokoro TTS** | `http://localhost:8880` |
 | **Kokoro TTS Swagger** | `http://localhost:8880/docs` |
 | **Kokoro TTS Web UI** | `http://localhost:8880/web` |
@@ -88,12 +83,10 @@ docker compose ps
 | `n8n` | `n8nio/n8n:latest` | `5678` | ✅ healthcheck |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | ✅ |
 | `file-upload` | *local build* — `file-upload-server/Dockerfile` | `8010` | ✅ healthcheck |
-| `cutengine` | *local build* — `cutengine/docker/Dockerfile` | `3000` | ✅ healthcheck |
-| `cutengine-redis` | `redis:7-alpine` | *(internal)* | ✅ healthcheck |
-| `cutengine-chromium` | `browserless/chrome:latest` | *(internal)* | ✅ healthcheck |
+| `remotion` | *local build* — `remotion/Dockerfile` | `3000` | ✅ healthcheck |
 | `kokoro-tts` | `ghcr.io/remsky/kokoro-fastapi-cpu:latest` | `8880` | ✅ healthcheck |
 
-**Note:** Some services (CutEngine, file-upload) are built from source locally. The first `docker compose up -d` will build these automatically.
+**Note:** Remotion and file-upload are built from source locally. The first `docker compose up -d` will build these automatically (Remotion may take 2-5 min on first build).
 
 ## 📁 File Upload API
 
@@ -121,43 +114,36 @@ Legacy `/images/` endpoints also work for backward compatibility.
 
 ---
 
-## 🎥 CutEngine — Video Rendering with Ken Burns Zoom
+## 🎥 Remotion — Video Rendering (React-based)
 
-[![CutEngine](https://img.shields.io/badge/CutEngine-MIT-brightgreen)](https://github.com/jjjames38/cutengine)
+[![Remotion](https://img.shields.io/badge/Remotion-4.0-blue)](https://remotion.dev)
 
-CutEngine is a self-hosted, Shotstack v1 API-compatible video render engine powered by Puppeteer + FFmpeg. It supports **Ken Burns zoom effects** (`zoomIn`, `zoomOut`, `slideLeft`, `slideRight`), 20+ transitions, captions, text overlays, multi-track audio mixing, and hardware encoding (NVENC/VideoToolbox/QSV).
+Remotion is a programmatic video render engine powered by React. It replaces CutEngine with a more reliable, well-maintained, and actively developed framework.
 
 ### Features
 
-- **Ken Burns zoom effects** — per-frame computed transforms for smooth zooms/pans
-- **Captions** — burnt-in subtitle overlays with font styling
-- **20+ transitions** — fade, wipe, slide, carousel, shuffle, zoom, directional
-- **14 asset types** — image, video, text, audio, shape, SVG, HTML, captions, and more
-- **Shotstack API drop-in** — same JSON schema as Shotstack cloud API
-- **Multi-track audio mixing** — TTS + background music with volume/fade/crossfade
-- **Templates** — reusable templates with `{{PLACEHOLDER}}` merge fields
-- **Batch rendering** — POST multiple renders in one request
+- **Ken Burns zoom effects** — zoomIn, zoomOut, slideLeft, slideRight, slideUp, slideDown
+- **Text overlays** — any system font, any position, with background/shadow styling
+- **HTML scenes** — rich HTML with full CSS for text-heavy videos
+- **Audio** — soundtrack + per-scene audio clips
+- **All standard resolutions** — preview, mobile, sd, hd, 1080, 4k
+- **Aspect ratios** — 16:9, 9:16, 1:1, 4:5, 4:3
 
-### API Endpoints (Shotstack v1 Compatible)
+### API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Health check (liveness) |
-| `GET` | `/health?detail=1` | Detailed health |
+| `GET` | `/health` | Health check |
 | `POST` | `/edit/v1/render` | Submit a render job |
 | `GET` | `/edit/v1/render/{id}` | Get render status |
 | `GET` | `/serve/v1/assets/{id}/output.mp4` | Download rendered video |
-| `POST` | `/x/v1/render/batch` | Batch render multiple jobs |
-| `POST` | `/edit/v1/template` | Create reusable template |
-| `POST` | `/edit/v1/template/{id}/render` | Render from template |
-| `GET` | `/metrics` | Prometheus metrics |
 
 ### From n8n Workflows — Zoom + Audio + Captions
 
 **1. Submit a render**
 
 ```
-POST http://cutengine:3000/edit/v1/render
+POST http://remotion:3000/edit/v1/render
 Body (JSON):
 {
   "timeline": {
@@ -189,34 +175,32 @@ Body (JSON):
           "asset": {
             "type": "text",
             "text": "{{ $json.Voiceover_Text }}",
-            "font": { "family": "Montserrat", "size": 48, "color": "#ffffff" },
-            "stroke": { "color": "#000000", "width": 3 }
+            "font": { "family": "sans-serif", "size": 48, "color": "#ffffff" }
           },
           "start": 0,
           "length": {{ $('audio-code').item.json.video_length }},
-          "position": "bottom",
-          "offset": { "y": 0.09 }
+          "position": "bottom"
         }]
       }
     ]
   },
-  "output": { "format": "mp4", "resolution": "hd" }
+  "output": { "format": "mp4", "resolution": "1080" }
 }
 ```
 
-→ Returns `{"success": true, "response": {"id": "abc123", "status": "queued"}}`
+→ Returns `{"success": true, "response": {"id": "abc123", "status": "rendering"}}`
 
 **2. Poll for status**
 
 ```
-GET http://cutengine:3000/edit/v1/render/{id}
+GET http://remotion:3000/edit/v1/render/{id}
 ```
-→ Status: `queued` → `rendering` → `done`
+→ Status: `rendering` → `done`
 
 **3. Download**
 
 ```
-GET http://cutengine:3000/serve/v1/assets/{id}/output.mp4
+GET http://remotion:3000/serve/v1/assets/{id}/output.mp4
 ```
 
 ### Supported Ken Burns Effects
@@ -237,57 +221,9 @@ GET http://cutengine:3000/serve/v1/assets/{id}/output.mp4
 | Type | Description |
 |------|-------------|
 | `image` | Image (JPEG, PNG, WebP) |
-| `video` | Video file |
-| `text` | Text overlay with font/stroke styling |
-| `richText` | HTML-formatted text |
-| `audio` | Audio file with volume/fade control |
-| `shape` | Geometric shapes (rect, circle, triangle) |
-| `svg` | Inline SVG |
-| `html` | HTML/CSS rendered via Chromium |
-| `title` | Animated title templates |
-| `caption` | SRT/WebVTT caption overlays |
-
-### Transitions
-
-`fade`, `fadeSlow`, `fadeFast`, `reveal`, `wipe`, `slide`, `carousel`, `shuffle`, `zoom`, `directional_left`, `directional_right`, `directional_up`, `directional_down`, `circle_open`, `linear_blur`, and more.
-
-### Filters
-
-`blur`, `boost`, `contrast`, `darken`, `greyscale`, `lighten`, `muted`, `negative`
-
-### Templates with Placeholders
-
-**Create:**
-
-```
-POST http://cutengine:3000/edit/v1/template
-Body:
-{
-  "name": "Reel Template",
-  "template": {
-    "timeline": {
-      "tracks": [{
-        "clips": [{
-          "asset": { "type": "image", "src": "{{IMAGE_URL}}" },
-          "start": 0, "length": 5,
-          "effect": "zoomIn"
-        }]
-      }]
-    },
-    "output": { "format": "mp4", "resolution": "hd" }
-  }
-}
-```
-
-**Render with merge fields:**
-
-```
-POST http://cutengine:3000/edit/v1/template/{id}/render
-Body:
-{
-  "merge": [{ "find": "IMAGE_URL", "replace": "https://..." }]
-}
-```
+| `text` | Text overlay with font styling |
+| `html` | Rich HTML/CSS content |
+| `audio` | Audio file |
 
 ---
 
@@ -353,8 +289,9 @@ A complete n8n workflow pattern:
 2. Code node → Convert to binary
 3. File Upload API → Upload image, get URL
 4. Kokoro TTS → Generate voiceover, upload audio
-5. CutEngine → Submit render with image + audio + captions + zoom
+5. Remotion → Submit render with image + audio + captions + zoom
 6. Poll render status → Download final MP4
+7. Upload to File Upload API → Permanent file URL
 ```
 
 ---
@@ -363,15 +300,12 @@ A complete n8n workflow pattern:
 
 | Issue | Solution |
 |-------|----------|
-| **CutEngine build fails** | Check that `cutengine/` directory exists with source files |
-| **Chromium not healthy** | Check logs: `docker compose logs cutengine-chromium` |
-| **Ken Burns not working** | Use `"effect": "zoomIn"` as a string at clip level (not nested object) |
-| **n8n can't reach services** | Use Docker service names: `http://cutengine:3000`, `http://kokoro-tts:8880` |
+| **Remotion build fails** | First build takes 2-5 min (npm install + Chromium bundle). Check logs: `docker compose logs remotion` |
+| **n8n can't reach services** | Use Docker service names: `http://remotion:3000`, `http://kokoro-tts:8880` |
 | **File Upload Admin not working** | Hard refresh: **Ctrl+Shift+R** |
 | **Port already in use** | Change host ports in `docker-compose.yml` |
-| **CutEngine render fails — `host.docker.internal`** | **Fixed in latest.** CutEngine now uses Docker service name (`cutengine:3000`) instead of `host.docker.internal` (which doesn't resolve on Linux). No action needed. |
-| **CutEngine render fails — `Cannot load libcuda.so.1`** | **Fixed in latest.** Enforced `libx264` software encoder since the host has no NVIDIA GPU. No action needed. |
-| **File upload healthcheck fails — `curl: not found`** | **Fixed in latest.** Healthcheck uses Python `urllib` instead of `curl` for wider Docker image compatibility. No action needed. |
+| **File upload healthcheck fails** | Healthcheck uses Python `urllib`. Ensure `python3` is available in the container |
+| **Upload node error: "Field required" for file** | Set Form-Data field `file` → Mode: "From Binary Property" → Property: `data` |
 
 ## 🔒 Security Notes
 
@@ -406,7 +340,7 @@ docker compose up -d --build
 | `5678` | n8n web UI |
 | `8010` | File Upload API + admin |
 | `6333` | Qdrant (internal only recommended) |
-| `3000` | CutEngine video rendering API |
+| `3000` | Remotion video rendering API |
 | `8880` | Kokoro TTS API |
 
 ## 📁 Project Structure
@@ -414,14 +348,19 @@ docker compose up -d --build
 ```
 n8n-qdrant-starter/
 ├── .env.example              # Environment template
-├── docker-compose.yml        # All services (n8n, Qdrant, file-upload, CutEngine, Kokoro)
+├── docker-compose.yml        # All services (n8n, Qdrant, file-upload, Remotion, Kokoro)
 ├── README.md
 ├── LICENSE                   # MIT
 ├── scripts/
 │   └── n8n-entrypoint.sh
-├── cutengine/                # CutEngine source (committed directly)
-│   ├── docker/Dockerfile
-│   └── ...
+├── remotion/                 # Remotion video render engine (replaces CutEngine)
+│   ├── Dockerfile
+│   ├── src/
+│   │   ├── server.ts
+│   │   ├── Root.tsx
+│   │   └── compositions/
+│   │       └── VideoComposition.tsx
+│   └── package.json
 ├── file-upload-server/       # File Upload API source
 │   ├── Dockerfile
 │   └── ...
