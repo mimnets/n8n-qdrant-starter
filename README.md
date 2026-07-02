@@ -315,6 +315,29 @@ A complete n8n workflow pattern:
 - Never commit `.env` (it's gitignored)
 - Set `UPLOAD_API_KEY` if file-upload port is exposed publicly
 
+## 💾 Backups
+
+Docker volumes are backed up automatically via cron:
+
+```bash
+# Run at 2:00 AM UTC daily
+0 2 * * * /home/ubuntu/backup-volumes.sh >> /home/ubuntu/backups/backup.log 2>&1
+```
+
+**Backed up volumes:** n8n_storage, postgres_storage, qdrant_storage, file_uploads, remotion_output  
+**Retention:** Last 7 daily backups kept  
+**Location:** `/home/ubuntu/backups/`
+
+### Restore from backup
+
+```bash
+# List available backups
+ls /home/ubuntu/backups/*.tar.gz
+
+# Restore a specific volume
+/home/ubuntu/restore-volume.sh n8n-qdrant-starter_n8n_storage /home/ubuntu/backups/n8n-qdrant-starter_n8n_storage-2026-07-02.tar.gz
+```
+
 ## ☁️ Deployment
 
 ```bash
