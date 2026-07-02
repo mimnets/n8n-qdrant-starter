@@ -79,7 +79,6 @@ services:
     build:
       context: ./file-upload-server
       dockerfile: Dockerfile
-    image: mimnets/n8n-file-upload:latest
     container_name: n8n-file-upload
     ports:
       - "8010:8001"
@@ -92,9 +91,9 @@ services:
     volumes:
       - file_uploads:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)\" || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
 
   # =========================================================================
@@ -146,6 +145,8 @@ services:
       - STORAGE_DRIVER=local
       - STORAGE_PATH=/data/assets
       - PORT=3000
+      - CHROMIUM_ASSET_BASE=http://cutengine:3000/serve/v1/assets
+      - ENCODER_CODEC=libx264
     volumes:
       - cutengine_assets:/data/assets
       - cutengine_db:/data

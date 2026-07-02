@@ -87,13 +87,13 @@ docker compose ps
 | `postgres` | `postgres:16-alpine` | `5432` *(internal)* | ✅ healthcheck |
 | `n8n` | `n8nio/n8n:latest` | `5678` | ✅ healthcheck |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | ✅ |
-| `file-upload` | `mimnets/n8n-file-upload:latest` | `8010` | ✅ healthcheck |
+| `file-upload` | *local build* — `file-upload-server/Dockerfile` | `8010` | ✅ healthcheck |
 | `cutengine` | *local build* — `cutengine/docker/Dockerfile` | `3000` | ✅ healthcheck |
 | `cutengine-redis` | `redis:7-alpine` | *(internal)* | ✅ healthcheck |
 | `cutengine-chromium` | `browserless/chrome:latest` | *(internal)* | ✅ healthcheck |
 | `kokoro-tts` | `ghcr.io/remsky/kokoro-fastapi-cpu:latest` | `8880` | ✅ healthcheck |
 
-**Note:** CutEngine is built from source the first time you run `docker compose up -d`. The source is committed directly in `cutengine/`. This takes a few minutes on first run.
+**Note:** Some services (CutEngine, file-upload) are built from source locally. The first `docker compose up -d` will build these automatically.
 
 ## 📁 File Upload API
 
@@ -367,8 +367,11 @@ A complete n8n workflow pattern:
 | **Chromium not healthy** | Check logs: `docker compose logs cutengine-chromium` |
 | **Ken Burns not working** | Use `"effect": "zoomIn"` as a string at clip level (not nested object) |
 | **n8n can't reach services** | Use Docker service names: `http://cutengine:3000`, `http://kokoro-tts:8880` |
-| **File Upload admin not working** | Hard refresh: **Ctrl+Shift+R** |
+| **File Upload Admin not working** | Hard refresh: **Ctrl+Shift+R** |
 | **Port already in use** | Change host ports in `docker-compose.yml` |
+| **CutEngine render fails — `host.docker.internal`** | **Fixed in latest.** CutEngine now uses Docker service name (`cutengine:3000`) instead of `host.docker.internal` (which doesn't resolve on Linux). No action needed. |
+| **CutEngine render fails — `Cannot load libcuda.so.1`** | **Fixed in latest.** Enforced `libx264` software encoder since the host has no NVIDIA GPU. No action needed. |
+| **File upload healthcheck fails — `curl: not found`** | **Fixed in latest.** Healthcheck uses Python `urllib` instead of `curl` for wider Docker image compatibility. No action needed. |
 
 ## 🔒 Security Notes
 
