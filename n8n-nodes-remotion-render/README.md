@@ -1,134 +1,313 @@
-# n8n-nodes-remotion-render
+# n8n-nodes-remotion-render — by mimnets
 
-n8n community node for rendering videos using a self-hosted [Remotion](https://remotion.dev) server.
+[![npm version](https://img.shields.io/npm/v/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
+[![npm downloads](https://img.shields.io/npm/dm/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
 
-Built for the [n8n-qdrant-starter](https://github.com/mimnets/n8n-qdrant-starter) project.
+An n8n community node for rendering videos using a self-hosted [Remotion](https://remotion.dev) server. Part of the [n8n-qdrant-starter](https://github.com/mimnets/n8n-qdrant-starter) project.
 
-## Features
+---
 
-- **Render videos** with images (Ken Burns effects), text overlays, and multi-track audio
-- **Dynamic input** — use upstream data OR configure manually in the node UI
-- **Automatic poll** — node blocks until render is done, returns the video URL
-- **Self-hosted** — connects to your own Remotion server at any URL
+## 🚀 Features
 
-## Installation
+- **📷 Multiple images** with Ken Burns effects (zoom, slide, pan)
+- **📝 Text overlays** — position at bottom (captions), center, or top
+- **🎵 Multi-track audio** — scene-specific audio clips + background soundtrack
+- **🔄 Dynamic input** — drag-and-drop fields OR pipe JSON from upstream nodes
+- **⏳ Auto-poll** — node blocks until video is ready, returns download URL
+- **🎬 Resolutions** — preview, mobile, SD, HD (1080p), 4K
+- **🌐 Any Remotion server** — local Docker, remote VPS, or cloud
 
-### Quick install (recommended)
+---
 
-1. In your n8n instance, go to **Settings → Community Nodes**
+## 📦 Installation
+
+### Quick install (via n8n UI)
+
+1. In your n8n, go to **Settings → Community Nodes**
 2. Click **Install**
-3. In the **npm Package Name** field, enter: `n8n-nodes-remotion-render`
+3. Enter: `n8n-nodes-remotion-render`
 4. Click **Install**
 
-### Docker install
+### Manual Docker install (for this project)
 
-If you're running n8n in Docker (like this project), mount a custom nodes folder:
-
-```bash
-mkdir -p ~/n8n-custom-nodes
-cd ~/n8n-custom-nodes
-npm init -y
-npm install n8n-nodes-remotion-render
-```
-
-Then add to your docker-compose.yml:
+If you're running the [n8n-qdrant-starter](https://github.com/mimnets/n8n-qdrant-starter) Docker setup, mount the node into the n8n container:
 
 ```yaml
-environment:
-  - N8N_CUSTOM_EXTENSIONS=/path/to/n8n-custom-nodes
-volumes:
-  - ~/n8n-custom-nodes:/path/to/n8n-custom-nodes
+# docker-compose.yml — add to n8n service
+n8n:
+  environment:
+    - N8N_CUSTOM_EXTENSIONS=/home/node/custom-nodes
+  volumes:
+    - ./n8n-nodes-remotion-render:/home/node/custom-nodes/n8n-nodes-remotion-render
 ```
 
-## Setup
+Then restart n8n:
+```bash
+docker compose up -d n8n
+```
 
-After installation, create a credential:
+---
 
-1. Go to **Credentials → New → Remotion Render API**
-2. Set **Server URL** to your Remotion server (e.g., `http://remotion:3000` or `http://192.168.1.100:3000`)
-3. Add an **API Key** if your server requires authentication
+## 🔐 Credential Setup
 
-## Usage
+After installing the node, create a credential:
 
-### Manual mode
+1. **n8n → Credentials → Add New → Remotion Render API - mimnets**
+2. **Server URL**: `http://remotion:3000` (Docker network name)  
+   *or* `http://150.136.150.227:3000` (external IP)
+3. **API Key**: leave blank (your server doesn't require one)
+4. **Save**
 
-Add images, text, and audio clips directly in the node UI:
+---
 
-1. Add **Images** with URLs, start times, lengths, and Ken Burns effects
-2. Add **Text Overlays** with alignment (vertical: bottom for captions), font, and color
-3. Add **Audio Clips** or a **Soundtrack**
+## 🎬 Usage
 
-### Input JSON mode
+### Manual mode (drag-and-drop)
 
-Connect any upstream node that outputs this structure:
+> **Node colors**: 🟣 **Remotion Render - mimnets** in the n8n editor
+
+1. Drag the **Remotion Render - mimnets** node into your workflow
+2. Select **Operation → Render Video**
+3. Choose **Input Method → Manual**
+4. Click **Add Image** — fill in URL, start time, length, effect
+5. Click **Add Text** — enter caption, set **Vertical Position → Bottom**
+6. Click **Add Audio** or fill in **Soundtrack** for background music
+7. Set **Resolution → 1080** (or whatever you need)
+8. Connect a trigger node before it (Manual, Webhook, Schedule, etc.)
+9. Run the workflow
+
+### Input JSON mode (dynamic data)
+
+Use this when you want to pass data from an upstream Code node, AI node, or HTTP request:
+
+1. **Input Method → From Input JSON**
+2. Connect the output of any node that returns this structure:
 
 ```json
 {
   "images": [
-    { "src": "https://...", "start": 0, "length": 5, "effect": "zoomIn" }
+    { "src": "https://example.com/photo1.jpg", "start": 0, "length": 10, "effect": "zoomIn" },
+    { "src": "https://example.com/photo2.jpg", "start": 10, "length": 10, "effect": "slideLeft" }
   ],
   "texts": [
-    { "text": "Hello", "start": 0, "length": 5, "vertical": "bottom" }
+    { "text": "Welcome to my video!", "start": 0, "length": 5, "vertical": "bottom", "fontSize": 48 },
+    { "text": "Thanks for watching", "start": 15, "length": 5, "vertical": "bottom" }
   ],
   "audios": [
-    { "src": "https://...", "start": 0, "length": 5 }
+    { "src": "https://example.com/narration-1.mp3", "start": 0, "length": 10 }
   ],
-  "soundtrack": { "src": "https://...", "volume": 0.15 },
+  "soundtrack": { "src": "https://example.com/background-music.mp3", "volume": 0.15 },
   "resolution": "1080",
   "fps": 25
 }
 ```
 
-Use with a Code node, HTTP Request, or any n8n node that returns JSON.
+Example using an n8n Code node:
+
+```javascript
+// Code node — outputs pass to Remotion Render node
+const images = [
+  { src: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564", start: 0, length: 8, effect: "zoomIn" },
+  { src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4", start: 8, length: 8, effect: "slideRight" },
+];
+
+const texts = [
+  { text: "Amazing Nature", start: 0, length: 16, vertical: "bottom", fontSize: 48, fontColor: "#FFFFFF" },
+];
+
+return { images, texts, resolution: "1080", fps: 25 };
+```
 
 ### Output
 
-The node returns:
-
 ```json
 {
-  "renderId": "abc123...",
+  "renderId": "abc123def456",
   "status": "done",
-  "videoUrl": "http://remotion:3000/serve/v1/assets/abc123/output.mp4",
-  "downloadUrl": "http://remotion:3000/serve/v1/assets/abc123/output.mp4",
-  "pollsNeeded": 5
+  "videoUrl": "http://remotion:3000/serve/v1/assets/abc123def456/output.mp4",
+  "downloadUrl": "http://remotion:3000/serve/v1/assets/abc123def456/output.mp4",
+  "pollsNeeded": 8
 }
 ```
 
-## Node Fields Reference
+Pass `downloadUrl` into an HTTP Request node (GET, Response Format: File) to download the MP4, or use it directly as a source URL.
 
-| Section | Field | Description |
+---
+
+## 🧩 Full Workflow Example
+
+```
+[Manual Trigger]
+       │
+       ▼
+[Code Node]  ← Build images[], texts[], audios[]
+       │
+       ▼
+[Remotion Render - mimnets]  ← Input Method: From Input JSON
+       │
+       ▼
+[HTTP Request]  ← GET the videoUrl → download file
+       │
+       ▼
+[Google Drive / Telegram / Email]  ← publish
+```
+
+---
+
+## 📋 Node Fields Reference
+
+### Image fields
+
+| Field | Type | Description |
 |---|---|---|
-| **Images** | Image URL | Public URL of the image |
-| | Start | When the image appears (seconds) |
-| | Length | How long it stays on screen (seconds) |
-| | Ken Burns Effect | zoomIn, zoomOut, slideLeft, etc. |
-| | Fade In/Out | Fade transition at start/end |
-| **Text** | Text | Caption content |
-| | Vertical Position | **bottom** for captions, center/top for titles |
-| | Horizontal Position | left, center, right |
-| | Font | Family, size, weight, color |
-| | Background | Semi-transparent background behind text |
-| **Audio** | URL | Audio file URL |
-| | Start/Length | When and how long it plays |
-| **Soundtrack** | URL | Background music |
-| | Volume | 0.0 to 1.0 (0.15 recommended) |
-| **Output** | Resolution | preview, mobile, sd, hd, 1080, 4k |
-| | FPS | 25 recommended |
+| Image URL | string | Public URL of the image |
+| Start (seconds) | number | When the image appears |
+| Length (seconds) | number | How long it stays on screen |
+| Ken Burns Effect | select | `zoomIn`, `zoomOut`, `slideLeft`, `slideRight`, `slideUp`, `slideDown`, `zoomInFast`, `zoomOutFast`, or None |
+| Fade In | boolean | Fade in at start of clip |
+| Fade Out | boolean | Fade out at end of clip |
 
-## Development
+### Text fields
+
+| Field | Type | Description |
+|---|---|---|
+| Text | string | Caption or title content |
+| Start (seconds) | number | When text appears |
+| Length (seconds) | number | How long it stays |
+| **Vertical Position** | select | **`bottom`** for captions, `center` / `top` for titles |
+| Horizontal Position | select | `left`, `center`, `right` |
+| Font Family | string | CSS font name (must be in Remotion container) |
+| Font Size | number | px size (scales with resolution) |
+| Font Weight | number | 100–900 (400=normal, 700=bold) |
+| Font Color | color | Hex color picker |
+| Background Color | string | CSS color like `rgba(0,0,0,0.3)` |
+
+### Audio fields
+
+| Field | Type | Description |
+|---|---|---|
+| Audio URL | string | URL of audio file (mp3, wav, ogg) |
+| Start (seconds) | number | When audio starts |
+| Length (seconds) | number | How long it plays |
+
+### Soundtrack (background audio)
+
+| Field | Type | Description |
+|---|---|---|
+| Audio URL | string | Background music URL |
+| Volume | number | 0–1 (0.15 = quiet background, 1 = full volume) |
+
+### Output fields
+
+| Field | Type | Description |
+|---|---|---|
+| Resolution | select | `preview` (512×288), `mobile` (640×360), `sd` (1024×576), `hd` (1280×720), **`1080`** (1920×1080), `4k` (3840×2160) |
+| FPS | number | 1–60 (25 recommended) |
+
+---
+
+## 🔧 Remotion Server Configuration
+
+Your Remotion server at `http://remotion:3000` supports these endpoints:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/edit/v1/render` | POST | Submit a render job (returns immediately with render ID) |
+| `/edit/v1/render/:id` | GET | Check render status — returns `"done"` when video is ready |
+| `/serve/v1/assets/:id/output.mp4` | GET | Download the rendered MP4 |
+| `/health` | GET | Server health check |
+| `/tools/api-builder` | GET | Visual JSON builder for the render payload |
+
+### Available Ken Burns effects
+
+| Value | Effect |
+|---|---|
+| `zoomIn` | Slow zoom into the image |
+| `zoomOut` | Slow zoom out of the image |
+| `zoomInFast` | Faster zoom in |
+| `zoomOutFast` | Faster zoom out |
+| `slideLeft` | Pan image to the left |
+| `slideRight` | Pan image to the right |
+| `slideUp` | Pan image upward |
+| `slideDown` | Pan image downward |
+
+### Available resolutions
+
+| Value | Dimensions | Use case |
+|---|---|---|
+| `preview` | 512×288 | Quick previews, testing |
+| `mobile` | 640×360 | Phone-optimized, social media |
+| `sd` | 1024×576 | Standard definition |
+| `hd` | 1280×720 | YouTube, social platforms |
+| `1080` (default) | 1920×1080 | Full HD — best quality |
+| `4k` | 3840×2160 | Ultra HD — longer render times |
+
+### Rebuilding the Remotion container
+
+If you modify the VideoComposition or server code:
 
 ```bash
+cd /home/ubuntu/n8n-qdrant-starter
+docker compose build remotion
+docker compose up -d remotion
+```
+
+---
+
+## 🚨 Troubleshooting
+
+### Text stays in center (not at bottom)
+
+The Remotion server uses `position: absolute; bottom: 80px` for `vertical: "bottom"`. Make sure:
+1. The Remotion container is rebuilt: `docker compose build remotion && docker compose up -d remotion`
+2. The node's **Vertical Position** is set to **Bottom**
+3. Check the server logs: `docker compose logs remotion`
+
+### "Node does not have any credentials set"
+
+You need to create a credential first:
+1. n8n → **Credentials** → **Add New** → **Remotion Render API - mimnets**
+2. Set **Server URL** to `http://remotion:3000`
+3. Save
+4. In the node, select this credential from the dropdown
+
+### Render fails or times out
+
+- Check the Remotion server is running: `curl http://remotion:3000/health`
+- Check server logs: `docker compose logs remotion`
+- Longer videos take more time — the node polls for up to 5 minutes
+- Ensure all image URLs and audio URLs are publicly accessible
+
+### Node icon shows broken image
+
+Update to the latest version: `n8n-nodes-remotion-render@0.1.1+` includes an SVG icon.
+
+---
+
+## 🏗 Development
+
+```bash
+# Clone / navigate to the project
+cd n8n-qdrant-starter/n8n-nodes-remotion-render
+
 # Install dependencies
 npm install
 
-# Build
+# Build (TypeScript → dist/)
 npm run build
 
-# Watch mode
+# Watch mode (auto-compile on changes)
 npm run dev
+
+# Publish to npm
+npm version patch
+npm publish
 ```
 
-## License
+---
 
-MIT
+## 📄 License
+
+MIT — use it freely in personal, commercial, and open-source projects.
+
+Built for the [n8n-qdrant-starter](https://github.com/mimnets/n8n-qdrant-starter) — a self-hosted AI video automation stack.
