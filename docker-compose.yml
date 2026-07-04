@@ -97,7 +97,7 @@ services:
       retries: 3
 
   # =========================================================================
-  # Remotion — Programmatic video render engine (replaces CutEngine).
+  # Remotion — Programmatic video render engine.
   # React-based composition with Ken Burns zoom, captions,
   # transitions, multi-track audio, and HTML scenes.
   # n8n workflows: POST http://remotion:3000/edit/v1/render

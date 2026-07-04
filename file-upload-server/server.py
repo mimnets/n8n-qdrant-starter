@@ -576,6 +576,83 @@ async def upload_file(
     }
 
 
+@app.post("/upload/json")
+async def upload_json(
+    request: Request,
+    x_api_key: str | None = Header(None),
+    api_key: str | None = Query(None),
+):
+    """
+    Upload a file via JSON (base64-encoded data).
+
+    Use this from n8n Code node when Form-Data doesn't work.
+    POST JSON body:
+    {
+      "filename": "output.mp4",
+      "data": "<base64-encoded file content>",
+      "content_type": "video/mp4"
+    }
+    """
+    check_api_key(x_api_key, api_key)
+
+    body = await request.json()
+    filename = body.get("filename", "file")
+    b64_data = body.get("data", "")
+    content_type = body.get("content_type", "application/octet-stream")
+
+    if not b64_data:
+        raise HTTPException(status_code=400, detail="No data provided")
+
+    import base64
+    try:
+        content = base64.b64decode(b64_data)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 data")
+
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(content)} bytes). Max allowed: {MAX_FILE_SIZE_MB} MB",
+        )
+
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        detected = detect_extension(content)
+        if detected:
+            ext = detected
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            )
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    unique_name = f"{timestamp}_{uuid.uuid4().hex[:8]}.{ext}"
+    file_path = UPLOAD_DIR / unique_name
+    file_path.write_bytes(content)
+
+    if BASE_URL:
+        base = BASE_URL.rstrip("/")
+    else:
+        host = request.headers.get("host", "localhost:8001")
+        scheme = "https" if request.headers.get("x-forwarded-proto") == "https" else "http"
+        base = f"{scheme}://{host}"
+
+    url = f"{base}/files/{unique_name}"
+
+    return {
+        "success": True,
+        "filename": unique_name,
+        "url": url,
+        "size_bytes": len(content),
+        "content_type": content_type,
+        "extension": ext,
+    }
+
+
 # ---------------------------------------------------------------------------
 # These legacy routes redirect to /files/{filename} or /files for backward
 # compatibility with existing workflows that reference /images/{filename}.

@@ -143,7 +143,6 @@ app.post("/edit/v1/render", async (req, res) => {
           outputLocation: outputPath,
           inputProps,
           crf: crfValue,
-          videoBitrate: "3M",
           chromiumOptions: {
             enableMultiProcessOnLinux: true,
           },

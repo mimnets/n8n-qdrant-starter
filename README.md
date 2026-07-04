@@ -14,7 +14,7 @@ A lightweight, self-hosted stack combining:
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
 - **[File Upload API](https://hub.docker.com/r/mimnets/n8n-file-upload)** — self-hosted file storage for images, audio, video, documents
-- **[Remotion](https://remotion.dev)** — programmatic video render engine (React-based) with Ken Burns zoom, transitions, captions, multi-track audio, and HTML scenes
+- **[Editframe](https://editframe.com)** — declarative HTML/CSS video render engine with text, images, video, audio, captions, and transitions
 - **[Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI)** — text-to-speech with 35+ voices (OpenAI-compatible API)
 
 ## 🏗️ Architecture
@@ -29,10 +29,10 @@ A lightweight, self-hosted stack combining:
               ┌─────────────┼──────────────────┐
               │             │                  │
     ┌─────────┴────┐  ┌────┴──────────┐       │
-    │ File Upload  │  │   Remotion    │       │
+    │ File Upload  │  │  Editframe    │       │
     │ (REST, 8010) │  │ (REST, 3000)  │       │
-    │  file store  │  │ Ken Burns +   │       │
-    └──────────────┘  │  Captions     │       │
+    │  file store  │  │  HTML/CSS     │       │
+    └──────────────┘  │   Videos      │       │
                       └───────┬───────┘       │
                               │               │
                               │         ┌─────┴──────┐
@@ -69,8 +69,8 @@ docker compose ps
 | **Qdrant Dashboard** | `http://localhost:6333/dashboard` |
 | **File Upload API** | `http://localhost:8010` |
 | **File Upload Admin** | `http://localhost:8010/admin` |
-| **Remotion API** | `http://localhost:3000` |
-| **Remotion Health** | `http://localhost:3000/health` |
+| **Editframe API** | `http://localhost:3000` |
+| **Editframe Health** | `http://localhost:3000/health` |
 | **Kokoro TTS** | `http://localhost:8880` |
 | **Kokoro TTS Swagger** | `http://localhost:8880/docs` |
 | **Kokoro TTS Web UI** | `http://localhost:8880/web` |
@@ -83,10 +83,10 @@ docker compose ps
 | `n8n` | `n8nio/n8n:latest` | `5678` | ✅ healthcheck |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | ✅ |
 | `file-upload` | *local build* — `file-upload-server/Dockerfile` | `8010` | ✅ healthcheck |
-| `remotion` | *local build* — `remotion/Dockerfile` | `3000` | ✅ healthcheck |
+| `editframe` | *local build* — `editframe-server/Dockerfile` | `3000` | ✅ healthcheck |
 | `kokoro-tts` | `ghcr.io/remsky/kokoro-fastapi-cpu:latest` | `8880` | ✅ healthcheck |
 
-**Note:** Remotion and file-upload are built from source locally. The first `docker compose up -d` will build these automatically (Remotion may take 2-5 min on first build).
+**Note:** Editframe and file-upload are built from source locally. The first `docker compose up -d` will build these automatically.
 
 ## 📁 File Upload API
 

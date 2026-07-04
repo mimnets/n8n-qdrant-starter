@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remotion → n8n API Builder</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f13; color: #e0e0e0; padding: 24px; }
+  
+  h1 { font-size: 24px; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+  h1 small { font-size: 13px; color: #888; font-weight: 400; }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+  
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel { background: #1a1a24; border-radius: 12px; padding: 20px; border: 1px solid #2a2a38; }
+  .panel h2 { font-size: 16px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+  
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 13px; color: #999; margin-bottom: 4px; font-weight: 500; }
+  .form-group .hint { font-size: 11px; color: #666; margin-top: 2px; }
+  .form-group select, .form-group input, .form-group textarea {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
+    background: #12121c; color: #e0e0e0; font-size: 13px; font-family: inherit;
+  }
+  .form-group textarea { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; resize: vertical; min-height: 40px; }
+  .form-group select:focus, .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #6366f1; }
+  
+  .inline-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .inline-group-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { padding: 6px 14px; border-radius: 6px; border: 1px solid #333; background: transparent; color: #888; cursor: pointer; font-size: 12px; }
+  .tab.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+  .tab:hover:not(.active) { background: #222; }
+  
+  .clip-card { background: #12121c; border: 1px solid #2a2a38; border-radius: 8px; padding: 14px; margin-bottom: 12px; position: relative; }
+  .clip-card .clip-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .clip-card .clip-header h3 { font-size: 13px; color: #ccc; }
+  .clip-card .clip-type-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #333; color: #aaa; }
+  .clip-card .remove-clip { background: none; border: none; color: #f44; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+  .clip-card .remove-clip:hover { background: rgba(255,68,68,0.15); }
+
+  .add-btn { padding: 8px 16px; border-radius: 6px; border: 1px dashed #444; background: transparent; color: #888; cursor: pointer; font-size: 12px; width: 100%; margin-top: 4px; }
+  .add-btn:hover { border-color: #6366f1; color: #6366f1; }
+
+  .json-panel { position: sticky; top: 24px; }
+  .json-panel pre { background: #0a0a12; padding: 16px; border-radius: 8px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 600px; overflow-y: auto; border: 1px solid #222; color: #c9d1d9; }
+  .copy-btn { 
+    padding: 8px 16px; border-radius: 6px; border: none; background: #6366f1; color: #fff; cursor: pointer; font-size: 13px; margin-top: 8px; width: 100%;
+    transition: background 0.2s;
+  }
+  .copy-btn:hover { background: #5558e6; }
+  .copy-btn.copied { background: #22c55e; }
+  .copy-btn .key { font-family: monospace; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px; }
+
+  .field-docs { margin-top: 16px; font-size: 12px; }
+  .field-docs summary { cursor: pointer; color: #777; font-weight: 500; padding: 4px 0; }
+  .field-docs .docs-content { padding: 8px 0; color: #999; }
+  .field-docs table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .field-docs td { padding: 4px 8px; border-bottom: 1px solid #222; font-size: 11px; vertical-align: top; }
+  .field-docs td:first-child { color: #6366f1; font-family: monospace; white-space: nowrap; }
+  .field-docs td:nth-child(2) { color: #aaa; }
+  .field-docs td:nth-child(3) { color: #666; font-size: 10px; white-space: nowrap; }
+
+  .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .toggle input { width: auto; }
+  .n8n-hint { background: #1a1a2e; border: 1px solid #333366; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 12px; color: #999; }
+  .n8n-hint code { background: #222; padding: 1px 5px; border-radius: 3px; color: #c9d1d9; font-size: 11px; }
+  .n8n-hint strong { color: #ccc; }
+
+  .import-export { display: flex; gap: 8px; margin-top: 8px; }
+  .import-export button { flex: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid #333; background: transparent; color: #888; cursor: pointer; font-size: 11px; }
+  .import-export button:hover { border-color: #555; color: #ddd; }
+</style>
+</head>
+<body>
+
+<h1>🎬 Remotion → n8n API Builder <small>v1.0</small></h1>
+<p class="subtitle">Visually build your <code style="color:#6366f1; background:#1a1a24; padding:2px 6px; border-radius:4px;">/edit/v1/render</code> payload — no more guessing the JSON structure.</p>
+
+<div class="layout">
+  <!-- LEFT: Form -->
+  <div>
+    <div class="panel">
+      <h2>Track 1 — Image</h2>
+      <div id="imageClips"></div>
+      <button class="add-btn" onclick="addImageClip()">+ Add Image Clip</button>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h2>Track 2 — Text</h2>
+      <div id="textClips"></div>
+      <button class="add-btn" onclick="addTextClip()">+ Add Text Clip</button>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h2>Track 3 — HTML / Audio</h2>
+      <div id="extraClips"></div>
+      <button class="add-btn" onclick="addHtmlClip()">+ Add HTML Clip</button>
+      <button class="add-btn" style="margin-top:6px;" onclick="addAudioAssetClip()">+ Add Audio Clip</button>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h2>Soundtrack (background audio)</h2>
+      <div class="form-group">
+        <input type="checkbox" id="soundtrackEnabled" onchange="toggleSoundtrack()" style="width:auto; margin-right:6px;">
+        <label style="display:inline; cursor:pointer;">Enable soundtrack</label>
+      </div>
+      <div id="soundtrackFields" style="display:none;">
+        <div class="form-group">
+          <label>Audio URL</label>
+          <input type="text" id="soundtrackSrc" placeholder="https://..." oninput="updateJSON()">
+        </div>
+        <div class="inline-group">
+          <div class="form-group">
+            <label>Volume</label>
+            <input type="number" id="soundtrackVolume" value="0.15" step="0.05" min="0" max="1" oninput="updateJSON()">
+          </div>
+          <div class="form-group">
+            <label>Effect</label>
+            <select id="soundtrackEffect" onchange="updateJSON()">
+              <option value="">None</option>
+              <option value="fadeInFadeOut">fadeInFadeOut</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h2>Output Settings</h2>
+      <div class="inline-group-3">
+        <div class="form-group">
+          <label>Format</label>
+          <select id="outputFormat" onchange="updateJSON()">
+            <option value="mp4">mp4</option>
+            <option value="webm">webm</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Resolution</label>
+          <select id="outputResolution" onchange="updateJSON()">
+            <option value="preview">preview (512x288)</option>
+            <option value="mobile">mobile (640x360)</option>
+            <option value="sd">sd (1024x576)</option>
+            <option value="hd">hd (1280x720)</option>
+            <option value="1080" selected>1080p (1920x1080)</option>
+            <option value="4k">4K (3840x2160)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>FPS</label>
+          <input type="number" id="outputFps" value="25" min="1" max="60" oninput="updateJSON()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: JSON output -->
+  <div class="json-panel">
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="margin-bottom:0;">Generated Payload</h2>
+        <span id="clipCount" style="font-size:12px; color:#666;">0 clips</span>
+      </div>
+      <pre id="jsonOutput">{}</pre>
+      <button class="copy-btn" id="copyBtn" onclick="copyJSON()">📋 Copy to clipboard</button>
+      
+      <details class="field-docs">
+        <summary>📖 Field reference — click to expand</summary>
+        <div class="docs-content">
+          <table>
+            <tr><td>asset.type</td><td>"image" | "text" | "html" | "audio"</td><td>required</td></tr>
+            <tr><td>start</td><td>Start time in seconds</td><td>required</td></tr>
+            <tr><td>length</td><td>Duration in seconds</td><td>required</td></tr>
+            <tr><td>effect</td><td>Ken Burns: zoomIn, zoomOut, slideLeft, slideRight, slideUp, slideDown</td><td>image only</td></tr>
+            <tr><td>transition</td><td>{ in: "fade", out: "fade" }</td><td>optional</td></tr>
+            <tr><td>asset.src</td><td>URL for image/audio assets</td><td>image/audio</td></tr>
+            <tr><td>asset.text</td><td>Caption text</td><td>text only</td></tr>
+            <tr><td>asset.font.family</td><td>Font family (default: sans-serif)</td><td>text only</td></tr>
+            <tr><td>asset.font.size</td><td>Font size in px (default: 42, scales with resolution)</td><td>text only</td></tr>
+            <tr><td>asset.font.color</td><td>Hex color (default: #FFFFFF)</td><td>text only</td></tr>
+            <tr><td>asset.alignment.horizontal</td><td>"left" | "center" | "right"</td><td>text only</td></tr>
+            <tr><td>asset.alignment.vertical</td><td>"top" | "center" | "bottom"</td><td>text only</td></tr>
+            <tr><td>asset.background</td><td>Text background color, e.g. "rgba(0,0,0,0.3)"</td><td>text only</td></tr>
+            <tr><td>asset.html</td><td>Raw HTML content</td><td>html only</td></tr>
+            <tr><td>soundtrack.src</td><td>Background music URL</td><td>plays full video</td></tr>
+            <tr><td>soundtrack.volume</td><td>0.0 - 1.0 (default: 0.15)</td><td>optional</td></tr>
+          </table>
+          <p style="margin-top:8px; color:#777;"><strong>Note:</strong> <code>x</code>, <code>y</code>, <code>textAlign</code>, <code>position</code> clip-level fields are <strong>not read</strong> by the current render code. Use <code>asset.alignment</code> instead.</p>
+        </div>
+      </details>
+
+      <details class="field-docs">
+        <summary>⚡ n8n expression hint</summary>
+        <div class="n8n-hint">
+          <p style="margin-bottom:6px;">Replace hardcoded values with n8n expressions:</p>
+          <code style="display:block; margin-bottom:4px;">"src": "{{ $json.final_image_url }}"</code>
+          <code style="display:block; margin-bottom:4px;">"text": "{{ $json.subtitle_text }}"</code>
+          <code style="display:block; margin-bottom:4px;">"src": "{{ $json.final_audio_url }}"</code>
+          <p style="margin-top:6px;">In n8n, paste this JSON into the HTTP Request node body field (set to JSON mode) and wrap with <code>=</code> prefix for expressions.</p>
+        </div>
+      </details>
+
+      <div class="import-export">
+        <button onclick="importJSON()">📥 Import JSON</button>
+        <button onclick="exportJSON()">📤 Export JSON</button>
+        <button onclick="resetAll()">🗑️ Reset</button>
+      </div>
+      <input type="file" id="jsonFileInput" accept=".json" style="display:none" onchange="handleFileImport(event)">
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+let state = {
+  imageClips: [],
+  textClips: [],
+  extraClips: [],     // html / audio
+  soundtrack: null,
+  output: { format: 'mp4', resolution: '1080', fps: 25 }
+};
+
+let clipIdCounter = 0;
+
+// ============ DEFAULT CLIPS ============
+function defaultImageClip() {
+  return {
+    id: ++clipIdCounter,
+    src: '',
+    start: 0,
+    length: 9,
+    fit: 'cover',
+    effect: 'zoomIn',
+    transitionIn: false,
+    transitionOut: false
+  };
+}
+
+function defaultTextClip() {
+  return {
+    id: ++clipIdCounter,
+    text: '',
+    fontFamily: 'Inter',
+    fontSize: 36,
+    fontColor: '#FFFFFF',
+    fontWeight: 400,
+    alignmentH: 'center',
+    alignmentV: 'bottom',
+    background: 'rgba(0,0,0,0.3)',
+    start: 0,
+    length: 9
+  };
+}
+
+function defaultHtmlClip() {
+  return {
+    id: ++clipIdCounter,
+    html: '<h1 style="color:white; text-align:center;">Hello</h1>',
+    start: 0,
+    length: 5
+  };
+}
+
+function defaultAudioAssetClip() {
+  return {
+    id: ++clipIdCounter,
+    src: '',
+    start: 0,
+    length: 9
+  };
+}
+
+// ============ RENDER ============
+function render() {
+  renderImageClips();
+  renderTextClips();
+  renderExtraClips();
+  updateJSON();
+}
+
+function renderImageClips() {
+  const container = document.getElementById('imageClips');
+  container.innerHTML = state.imageClips.map((clip, i) => `
+    <div class="clip-card">
+      <div class="clip-header">
+        <h3>Image #${i+1}</h3>
+        <span class="clip-type-badge">image</span>
+        <button class="remove-clip" onclick="removeClip('image', ${i})">×</button>
+      </div>
+      <div class="form-group">
+        <label>Image URL</label>
+        <input type="text" value="${esc(clip.src)}" placeholder="https://..." oninput="updateClip('image', ${i}, 'src', this.value)">
+      </div>
+      <div class="inline-group">
+        <div class="form-group">
+          <label>Start (s)</label>
+          <input type="number" value="${clip.start}" min="0" step="0.5" oninput="updateClip('image', ${i}, 'start', parseFloat(this.value)||0)">
+        </div>
+        <div class="form-group">
+          <label>Length (s)</label>
+          <input type="number" value="${clip.length}" min="0.5" step="0.5" oninput="updateClip('image', ${i}, 'length', parseFloat(this.value)||0.5)">
+        </div>
+      </div>
+      <div class="inline-group">
+        <div class="form-group">
+          <label>Effect (Ken Burns)</label>
+          <select onchange="updateClip('image', ${i}, 'effect', this.value)">
+            ${['','zoomIn','zoomOut','zoomInFast','zoomOutFast','slideLeft','slideRight','slideUp','slideDown'].map(v =>
+              `<option value="${v}" ${clip.effect===v?'selected':''}>${v||'None'}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fit</label>
+          <select onchange="updateClip('image', ${i}, 'fit', this.value)">
+            <option value="cover" ${clip.fit==='cover'?'selected':''}>cover</option>
+            <option value="contain" ${clip.fit==='contain'?'selected':''}>contain</option>
+            <option value="fill" ${clip.fit==='fill'?'selected':''}>fill</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex; gap:12px;">
+          <span>Transitions:</span>
+          <label style="font-weight:400; cursor:pointer;"><input type="checkbox" ${clip.transitionIn?'checked':''} onchange="updateClip('image', ${i}, 'transitionIn', this.checked)"> Fade in</label>
+          <label style="font-weight:400; cursor:pointer;"><input type="checkbox" ${clip.transitionOut?'checked':''} onchange="updateClip('image', ${i}, 'transitionOut', this.checked)"> Fade out</label>
+        </label>
+      </div>
+    </div>
+  `).join('') || '<p style="color:#555; font-size:13px; text-align:center; padding:20px;">No image clips. Add one below.</p>';
+}
+
+function renderTextClips() {
+  const container = document.getElementById('textClips');
+  container.innerHTML = state.textClips.map((clip, i) => `
+    <div class="clip-card">
+      <div class="clip-header">
+        <h3>Text #${i+1}</h3>
+        <span class="clip-type-badge">text</span>
+        <button class="remove-clip" onclick="removeClip('text', ${i})">×</button>
+      </div>
+      <div class="form-group">
+        <label>Text content</label>
+        <textarea rows="2" placeholder="Your caption text..." oninput="updateClip('text', ${i}, 'text', this.value)">${esc(clip.text)}</textarea>
+      </div>
+      <div class="inline-group-3">
+        <div class="form-group">
+          <label>Font</label>
+          <input type="text" value="${esc(clip.fontFamily)}" oninput="updateClip('text', ${i}, 'fontFamily', this.value)">
+        </div>
+        <div class="form-group">
+          <label>Size</label>
+          <input type="number" value="${clip.fontSize}" min="10" max="200" oninput="updateClip('text', ${i}, 'fontSize', parseInt(this.value)||36)">
+        </div>
+        <div class="form-group">
+          <label>Weight</label>
+          <input type="number" value="${clip.fontWeight}" min="100" max="900" step="100" oninput="updateClip('text', ${i}, 'fontWeight', parseInt(this.value)||400)">
+        </div>
+      </div>
+      <div class="inline-group">
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" value="${clip.fontColor}" oninput="updateClip('text', ${i}, 'fontColor', this.value)">
+        </div>
+        <div class="form-group">
+          <label>Background</label>
+          <input type="text" value="${esc(clip.background)}" placeholder="rgba(0,0,0,0.3)" oninput="updateClip('text', ${i}, 'background', this.value)">
+        </div>
+      </div>
+      <div class="inline-group">
+        <div class="form-group">
+          <label>Horizontal</label>
+          <select onchange="updateClip('text', ${i}, 'alignmentH', this.value)">
+            <option value="left" ${clip.alignmentH==='left'?'selected':''}>Left</option>
+            <option value="center" ${clip.alignmentH==='center'?'selected':''}>Center</option>
+            <option value="right" ${clip.alignmentH==='right'?'selected':''}>Right</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Vertical <span style="color:#6366f1;">← key one</span></label>
+          <select onchange="updateClip('text', ${i}, 'alignmentV', this.value)">
+            <option value="top" ${clip.alignmentV==='top'?'selected':''}>Top</option>
+            <option value="center" ${clip.alignmentV==='center'?'selected':''}>Center</option>
+            <option value="bottom" ${clip.alignmentV==='bottom'?'selected':''}>Bottom</option>
+          </select>
+        </div>
+      </div>
+      <div class="inline-group">
+        <div class="form-group">
+          <label>Start (s)</label>
+          <input type="number" value="${clip.start}" min="0" step="0.5" oninput="updateClip('text', ${i}, 'start', parseFloat(this.value)||0)">
+        </div>
+        <div class="form-group">
+          <label>Length (s)</label>
+          <input type="number" value="${clip.length}" min="0.5" step="0.5" oninput="updateClip('text', ${i}, 'length', parseFloat(this.value)||0.5)">
+        </div>
+      </div>
+    </div>
+  `).join('') || '<p style="color:#555; font-size:13px; text-align:center; padding:20px;">No text clips. Add one below.</p>';
+}
+
+function renderExtraClips() {
+  const container = document.getElementById('extraClips');
+  container.innerHTML = state.extraClips.map((clip, i) => {
+    const typeLabel = clip.type || 'html';
+    const isAudio = clip.type === 'audio';
+    
+    if (isAudio) {
+      return `
+        <div class="clip-card">
+          <div class="clip-header">
+            <h3>Audio #${i+1}</h3>
+            <span class="clip-type-badge">audio</span>
+            <button class="remove-clip" onclick="removeClip('extra', ${i})">×</button>
+          </div>
+          <div class="form-group">
+            <label>Audio URL</label>
+            <input type="text" value="${esc(clip.src||'')}" placeholder="https://..." oninput="updateClip('extra', ${i}, 'src', this.value)">
+          </div>
+          <div class="inline-group">
+            <div class="form-group">
+              <label>Start (s)</label>
+              <input type="number" value="${clip.start}" min="0" step="0.5" oninput="updateClip('extra', ${i}, 'start', parseFloat(this.value)||0)">
+            </div>
+            <div class="form-group">
+              <label>Length (s)</label>
+              <input type="number" value="${clip.length}" min="0.5" step="0.5" oninput="updateClip('extra', ${i}, 'length', parseFloat(this.value)||0.5)">
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    return `
+      <div class="clip-card">
+        <div class="clip-header">
+          <h3>HTML #${i+1}</h3>
+          <span class="clip-type-badge">html</span>
+          <button class="remove-clip" onclick="removeClip('extra', ${i})">×</button>
+        </div>
+        <div class="form-group">
+          <label>HTML content</label>
+          <textarea rows="3" placeholder="<h1>Hello</h1>" oninput="updateClip('extra', ${i}, 'html', this.value)">${esc(clip.html||'')}</textarea>
+        </div>
+        <div class="inline-group">
+          <div class="form-group">
+            <label>Start (s)</label>
+            <input type="number" value="${clip.start}" min="0" step="0.5" oninput="updateClip('extra', ${i}, 'start', parseFloat(this.value)||0)">
+          </div>
+          <div class="form-group">
+            <label>Length (s)</label>
+            <input type="number" value="${clip.length}" min="0.5" step="0.5" oninput="updateClip('extra', ${i}, 'length', parseFloat(this.value)||0.5)">
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('') || '<p style="color:#555; font-size:13px; text-align:center; padding:20px;">No additional clips.</p>';
+}
+
+// ============ MUTATIONS ============
+function addImageClip() { state.imageClips.push(defaultImageClip()); render(); }
+function addTextClip() { state.textClips.push(defaultTextClip()); render(); }
+function addHtmlClip() { state.extraClips.push({ ...defaultHtmlClip(), type: 'html' }); render(); }
+function addAudioAssetClip() { state.extraClips.push({ ...defaultAudioAssetClip(), type: 'audio' }); render(); }
+
+function removeClip(track, idx) {
+  if (track === 'image') state.imageClips.splice(idx, 1);
+  else if (track === 'text') state.textClips.splice(idx, 1);
+  else if (track === 'extra') state.extraClips.splice(idx, 1);
+  render();
+}
+
+function updateClip(track, idx, key, val) {
+  let arr = track === 'image' ? state.imageClips : track === 'text' ? state.textClips : state.extraClips;
+  if (!arr[idx]) return;
+  arr[idx][key] = val;
+  updateJSON();
+}
+
+function toggleSoundtrack() {
+  document.getElementById('soundtrackFields').style.display =
+    document.getElementById('soundtrackEnabled').checked ? 'block' : 'none';
+  if (!document.getElementById('soundtrackEnabled').checked) {
+    state.soundtrack = null;
+  } else {
+    state.soundtrack = { src: '', volume: 0.15, effect: '' };
+  }
+  updateJSON();
+}
+
+// ============ JSON GENERATION ============
+function buildJSON() {
+  const tracks = [];
+  
+  // Track 1: images
+  if (state.imageClips.length > 0) {
+    const clips = state.imageClips.map(c => {
+      const clip = {
+        asset: { type: 'image', src: c.src },
+        start: c.start,
+        length: c.length,
+        fit: c.fit || 'cover'
+      };
+      if (c.effect) clip.effect = c.effect;
+      if (c.transitionIn || c.transitionOut) {
+        clip.transition = {};
+        if (c.transitionIn) clip.transition.in = 'fade';
+        if (c.transitionOut) clip.transition.out = 'fade';
+      }
+      return clip;
+    });
+    tracks.push({ clips });
+  }
+  
+  // Track 2: text
+  if (state.textClips.length > 0) {
+    const clips = state.textClips.map(c => ({
+      asset: {
+        type: 'text',
+        text: c.text,
+        font: {
+          family: c.fontFamily || 'Inter',
+          size: parseInt(c.fontSize) || 36,
+          color: c.fontColor || '#FFFFFF',
+          weight: parseInt(c.fontWeight) || 400
+        },
+        alignment: {
+          horizontal: c.alignmentH || 'center',
+          vertical: c.alignmentV || 'bottom'
+        },
+        background: c.background || 'rgba(0,0,0,0.3)'
+      },
+      start: c.start,
+      length: c.length
+    }));
+    tracks.push({ clips });
+  }
+  
+  // Track 3: html + audio
+  if (state.extraClips.length > 0) {
+    const clips = state.extraClips.map(c => {
+      if (c.type === 'audio') {
+        return {
+          asset: { type: 'audio', src: c.src },
+          start: c.start,
+          length: c.length
+        };
+      }
+      return {
+        asset: { type: 'html', html: c.html },
+        start: c.start,
+        length: c.length
+      };
+    });
+    tracks.push({ clips });
+  }
+  
+  const payload = {
+    timeline: {
+      tracks
+    },
+    output: {
+      format: document.getElementById('outputFormat').value,
+      resolution: document.getElementById('outputResolution').value,
+      fps: parseInt(document.getElementById('outputFps').value) || 25
+    }
+  };
+  
+  // Soundtrack
+  if (document.getElementById('soundtrackEnabled').checked && state.soundtrack) {
+    const st = { src: document.getElementById('soundtrackSrc').value };
+    const vol = parseFloat(document.getElementById('soundtrackVolume').value);
+    if (!isNaN(vol)) st.volume = vol;
+    const eff = document.getElementById('soundtrackEffect').value;
+    if (eff) st.effect = eff;
+    payload.timeline.soundtrack = st;
+  }
+  
+  return payload;
+}
+
+function updateJSON() {
+  const obj = buildJSON();
+  const count = state.imageClips.length + state.textClips.length + state.extraClips.length;
+  document.getElementById('clipCount').textContent = `${count} clip${count!==1?'s':''}`;
+  document.getElementById('jsonOutput').textContent = JSON.stringify(obj, null, 2);
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============ CLIPBOARD ============
+function copyJSON() {
+  const text = document.getElementById('jsonOutput').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 Copy to clipboard'; btn.classList.remove('copied'); }, 2000);
+  }).catch(err => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    alert('Copied!');
+  });
+}
+
+// ============ IMPORT / EXPORT ============
+function importJSON() {
+  document.getElementById('jsonFileInput').click();
+}
+
+function handleFileImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      loadFromPayload(data);
+      render();
+    } catch(err) {
+      alert('Invalid JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function exportJSON() {
+  const text = document.getElementById('jsonOutput').textContent;
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'remotion-payload.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function resetAll() {
+  if (!confirm('Reset all clips and settings?')) return;
+  state = { imageClips: [], textClips: [], extraClips: [], soundtrack: null, output: { format: 'mp4', resolution: '1080', fps: 25 } };
+  document.getElementById('soundtrackEnabled').checked = false;
+  document.getElementById('soundtrackFields').style.display = 'none';
+  document.getElementById('outputFormat').value = 'mp4';
+  document.getElementById('outputResolution').value = '1080';
+  document.getElementById('outputFps').value = 25;
+  render();
+}
+
+function loadFromPayload(data) {
+  state = { imageClips: [], textClips: [], extraClips: [], soundtrack: null, output: { format: 'mp4', resolution: '1080', fps: 25 } };
+  
+  if (data.output) {
+    if (data.output.format) document.getElementById('outputFormat').value = data.output.format;
+    if (data.output.resolution) document.getElementById('outputResolution').value = data.output.resolution;
+    if (data.output.fps) document.getElementById('outputFps').value = data.output.fps;
+    state.output = { ...state.output, ...data.output };
+  }
+  
+  if (data.timeline?.soundtrack) {
+    document.getElementById('soundtrackEnabled').checked = true;
+    document.getElementById('soundtrackFields').style.display = 'block';
+    document.getElementById('soundtrackSrc').value = data.timeline.soundtrack.src || '';
+    document.getElementById('soundtrackVolume').value = data.timeline.soundtrack.volume ?? 0.15;
+    document.getElementById('soundtrackEffect').value = data.timeline.soundtrack.effect || '';
+    state.soundtrack = data.timeline.soundtrack;
+  }
+  
+  if (data.timeline?.tracks) {
+    // Reorganize tracks into our category structure
+    data.timeline.tracks.forEach(track => {
+      (track.clips || []).forEach(clip => {
+        const asset = clip.asset || {};
+        const start = clip.start ?? 0;
+        const length = clip.length ?? 5;
+        
+        if (asset.type === 'image') {
+          state.imageClips.push({
+            id: ++clipIdCounter,
+            src: asset.src || '',
+            start,
+            length,
+            fit: clip.fit || 'cover',
+            effect: clip.effect || '',
+            transitionIn: clip.transition?.in === 'fade',
+            transitionOut: clip.transition?.out === 'fade'
+          });
+        } else if (asset.type === 'text') {
+          state.textClips.push({
+            id: ++clipIdCounter,
+            text: asset.text || '',
+            fontFamily: asset.font?.family || 'Inter',
+            fontSize: asset.font?.size || 36,
+            fontColor: asset.font?.color || '#FFFFFF',
+            fontWeight: asset.font?.weight || 400,
+            alignmentH: asset.alignment?.horizontal || 'center',
+            alignmentV: asset.alignment?.vertical || 'bottom',
+            background: asset.background || 'rgba(0,0,0,0.3)',
+            start,
+            length
+          });
+        } else if (asset.type === 'html') {
+          state.extraClips.push({
+            id: ++clipIdCounter,
+            type: 'html',
+            html: asset.html || '',
+            start,
+            length
+          });
+        } else if (asset.type === 'audio') {
+          state.extraClips.push({
+            id: ++clipIdCounter,
+            type: 'audio',
+            src: asset.src || '',
+            start,
+            length
+          });
+        }
+      });
+    });
+  }
+}
+
+// ============ INIT ============
+// Start with one example clip of each type
+state.imageClips.push(defaultImageClip());
+state.imageClips[0].src = 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&h=1080&fit=crop';
+state.imageClips[0].effect = 'zoomIn';
+state.textClips.push(defaultTextClip());
+state.textClips[0].text = 'Your caption text here';
+state.textClips[0].alignmentV = 'bottom';
+render();
+</script>
+</body>
+</html>
