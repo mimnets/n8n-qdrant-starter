@@ -52,3 +52,7 @@ Thumbs.db
 # Remotion
 remotion/node_modules/
 remotion/dist/
+
+# n8n community node
+n8n-nodes-remotion-render/node_modules/
+n8n-nodes-remotion-render/dist/

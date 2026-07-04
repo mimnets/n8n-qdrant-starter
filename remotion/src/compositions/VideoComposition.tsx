@@ -145,24 +145,50 @@ function getKenBurnsTransform(
   }
 }
 
-// Resolve text position
+// Resolve text position — uses absolute positioning for reliability
 function getTextPosition(
   alignment?: { horizontal?: string; vertical?: string },
-  position?: string
+  _position?: string
 ): React.CSSProperties {
-  const h = alignment?.horizontal ?? position === "bottom" ? "center" : "center";
-  const v = alignment?.vertical ?? position === "bottom" ? "flex-end" : "center";
+  const h = alignment?.horizontal ?? "center";
+  const v = alignment?.vertical ?? "bottom";
+
+  // Map horizontal alignment to CSS
+  let left: string | number = "50%";
+  let transformX = "-50%";
+  if (h === "left") { left = 40; transformX = "0"; }
+  else if (h === "right") { left = "auto"; transformX = "0"; }
+
+  // Map vertical alignment to CSS
+  let bottom: string | number | undefined;
+  let top: string | number | undefined;
+  let transformY = "0";
+  if (v === "bottom") {
+    bottom = 80;  // 80px from bottom edge
+    transformY = "0";
+  } else if (v === "top") {
+    top = 80;
+    transformY = "0";
+  } else {
+    // center
+    top = "50%";
+    transformY = "-50%";
+  }
 
   return {
+    position: "absolute",
+    left: h === "right" ? "auto" : left,
+    right: h === "right" ? 40 : "auto",
+    top: top ?? "auto",
+    bottom: bottom ?? "auto",
+    transform: `translate(${transformX}, ${transformY})`,
     display: "flex",
-    alignItems:
-      v === "top" ? "flex-start" : v === "bottom" ? "flex-end" : "center",
-    justifyContent:
-      h === "left"
-        ? "flex-start"
-        : h === "right"
-          ? "flex-end"
-          : "center",
+    justifyContent: "center",
+    alignItems: "center",
+    width: "auto",
+    height: "auto",
+    maxWidth: "80%",
+    maxHeight: "auto",
   };
 }
 
@@ -207,17 +233,12 @@ const TextOverlay: React.FC<{
   const font = asset.font ?? {};
   const align = asset.alignment ?? {};
 
-  // Padding from edges
-  const padBottom = Math.round(height * 0.1);
-  const padHorizontal = 40;
-
   const posStyle = getTextPosition(align, clip.position);
 
   return (
     <AbsoluteFill
       style={{
         ...posStyle,
-        padding: `${padBottom}px ${padHorizontal}px`,
         pointerEvents: "none",
       }}
     >
