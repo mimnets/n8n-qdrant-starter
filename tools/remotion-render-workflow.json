@@ -1,0 +1,85 @@
+{
+  "name": "Remotion Video Render",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "input-note",
+      "name": "📥 INPUT — Wire your data source here",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// BUILD TIMELINE → produces full render payload\n// ============================================================\n// Takes input data and builds the Remotion API body.\n//\n// Expected input:\n//   images: [{ src, start, length, effect }]  // or single imageUrl\n//   texts:  [{ text, start, length, vertical, horizontal, fontSize }]\n//   audios: [{ src, start, length }]\n//   soundtrack: { src, volume }  // or soundtrackUrl string\n//   resolution: \"1080\"\n//   fps: 25\n//\n// All optional — sensible defaults fill in the gaps.\n\nconst input = $input.first().json;\n\nconst images = (input.images && input.images.length)\n  ? input.images\n  : [{ src: input.imageUrl || 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&h=1080&fit=crop' }];\n\nconst texts = (input.texts && input.texts.length)\n  ? input.texts\n  : (input.caption ? [{ text: input.caption }] : []);\n\nconst audios = (input.audios && input.audios.length) ? input.audios : [];\n\n// Calculate total duration from longest clip\nconst totalDur = [...images, ...texts, ...audios].reduce((max, c) =>\n  Math.max(max, (c.start ?? 0) + (c.length ?? 5)), 0\n) || 5;\n\nconst tracks = [];\n\n// Track 1: Images (with optional Ken Burns effects)\nif (images.length) {\n  tracks.push({\n    clips: images.map(img => {\n      const clip = {\n        asset: { type: 'image', src: img.src },\n        start: img.start ?? 0,\n        length: img.length ?? totalDur,\n        fit: img.fit || 'cover'\n      };\n      if (img.effect) clip.effect = img.effect;\n      const fadeIn = img.fadeIn || img.transition?.in === 'fade';\n      const fadeOut = img.fadeOut || img.transition?.out === 'fade';\n      if (fadeIn || fadeOut) {\n        clip.transition = {};\n        if (fadeIn) clip.transition.in = 'fade';\n        if (fadeOut) clip.transition.out = 'fade';\n      }\n      return clip;\n    })\n  });\n}\n\n// Track 2: Text overlays (use alignment.vertical for position!)\nif (texts.length) {\n  tracks.push({\n    clips: texts.map(txt => ({\n      asset: {\n        type: 'text',\n        text: txt.text || '',\n        font: {\n          family: txt.fontFamily || 'Inter',\n          size: txt.fontSize || 36,\n          color: txt.fontColor || '#FFFFFF',\n          weight: txt.fontWeight || 400\n        },\n        alignment: {\n          horizontal: txt.horizontal || 'center',\n          vertical: txt.vertical || 'bottom'  // ← this is what positions it!\n        },\n        background: txt.background || 'rgba(0,0,0,0.3)'\n      },\n      start: txt.start ?? 0,\n      length: txt.length ?? totalDur\n    }))\n  });\n}\n\n// Track 3: Scene audio clips\nif (audios.length) {\n  tracks.push({\n    clips: audios.map(a => ({\n      asset: { type: 'audio', src: a.src },\n      start: a.start ?? 0,\n      length: a.length ?? totalDur\n    }))\n  });\n}\n\nconst timeline = { tracks };\n\n// Soundtrack (background audio plays full duration)\nconst soundtrackSrc = input.soundtrack?.src || input.soundtrackUrl;\nif (soundtrackSrc) {\n  timeline.soundtrack = {\n    src: soundtrackSrc,\n    volume: input.soundtrack?.volume ?? 0.15\n  };\n}\n\n// Return full payload — HTTP node will POST this as-is\nreturn {\n  timeline: timeline,\n  output: {\n    format: 'mp4',\n    resolution: input.resolution || '1080',\n    fps: input.fps || 25\n  }\n};"
+      },
+      "id": "build-timeline",
+      "name": "🔨 Build Timeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://remotion:3000/edit/v1/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {},
+        "alwaysOutputData": true
+      },
+      "id": "render-post",
+      "name": "🚀 POST render request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// POLL until render is done (handles the full wait loop)\n// ============================================================\n// Remotion renders async — POST returns immediately with an ID.\n// This node polls GET /edit/v1/render/:id every 2 seconds\n// until status is \"done\" or we hit maxAttempts.\n\nconst axios = require('axios');\n\nconst renderResponse = $input.first().json;\n\nif (!renderResponse.success) {\n  throw new Error('Render API error: ' + JSON.stringify(renderResponse));\n}\n\nconst renderId = renderResponse.response.id;\nconst pollUrl = 'http://remotion:3000/edit/v1/render/' + renderId;\nconst maxAttempts = 150;  // 150 polls × 2s = 5 min max\n\nfor (let i = 0; i < maxAttempts; i++) {\n  // Wait 2 seconds between polls\n  await new Promise(resolve => setTimeout(resolve, 2000));\n\n  const resp = await axios.get(pollUrl);\n  const data = resp.data;\n\n  if (!data.success) {\n    throw new Error('Poll failed: ' + JSON.stringify(data));\n  }\n\n  const status = data.response.status;\n\n  if (status === 'done') {\n    return {\n      renderId: renderId,\n      status: 'done',\n      videoUrl: 'http://remotion:3000' + data.response.url,\n      pollsNeeded: i + 1\n    };\n  }\n\n  if (status === 'failed') {\n    throw new Error('Render failed: ' + (data.response.error || 'unknown error'));\n  }\n}\n\nthrow new Error('Render timed out after ' + maxAttempts + ' polls (' + renderId + ')');"
+      },
+      "id": "poll-and-wait",
+      "name": "⏳ Poll until done (waits here)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// OUTPUT — Video is ready!\n// ============================================================\n// Use $json.videoUrl to download the MP4\n//\n// Connect downstream nodes here:\n//   - HTTP Request to download the file\n//   - Google Drive / Telegram / YouTube to publish\n//   - Or pass to next step\n\nconst result = $input.first().json;\n\nreturn {\n  renderId: result.renderId,\n  status: 'done',\n  videoUrl: result.videoUrl,\n  message: 'Render complete! Took ' + result.pollsNeeded + ' polls',\n  // Download URL (use with HTTP Request node set to GET with Response Format: File)\n  downloadUrl: result.videoUrl\n};"
+      },
+      "id": "output-ready",
+      "name": "✅ Render Complete Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "📥 INPUT — Wire your data source here": {
+      "main": [[ { "node": "🔨 Build Timeline", "type": "main", "index": 0 } ]]
+    },
+    "🔨 Build Timeline": {
+      "main": [[ { "node": "🚀 POST render request", "type": "main", "index": 0 } ]]
+    },
+    "🚀 POST render request": {
+      "main": [[ { "node": "⏳ Poll until done (waits here)", "type": "main", "index": 0 } ]]
+    },
+    "⏳ Poll until done (waits here)": {
+      "main": [[ { "node": "✅ Render Complete Output", "type": "main", "index": 0 } ]]
+    }
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "remotion-render-module"
+  }
+}

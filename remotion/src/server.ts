@@ -59,6 +59,16 @@ async function sendCallback(callbackUrl: string, payload: any) {
   }
 }
 
+// Serve the API Builder tool
+app.get("/tools/api-builder", (_req, res) => {
+  const filePath = path.resolve(__dirname, "api-builder.html");
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ error: "Builder UI not found" });
+  }
+});
+
 // Health check
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", engine: "remotion" });
