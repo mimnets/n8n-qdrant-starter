@@ -1,0 +1,53 @@
+{
+  "name": "n8n-nodes-remotion-render",
+  "version": "0.1.2",
+  "description": "n8n community node for rendering videos using your self-hosted Remotion server. Supports multiple images with Ken Burns effects, text overlays with alignment, multi-track audio, and dynamic input from upstream nodes.",
+  "keywords": [
+    "n8n",
+    "n8n-community-node",
+    "n8n-nodes",
+    "remotion",
+    "video",
+    "render",
+    "video-generation"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/mimnets/n8n-qdrant-starter",
+  "author": {
+    "name": "Monirul Islam",
+    "email": "mimnets@users.noreply.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mimnets/n8n-qdrant-starter.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/RemotionRenderApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/RemotionRender/RemotionRender.node.js"
+    ]
+  },
+  "dependencies": {
+    "n8n-workflow": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "gulp": "^5.0.0",
+    "gulp-clean": "^0.4.0",
+    "rimraf": "^6.0.0",
+    "typescript": "^5.7.0"
+  }
+}
