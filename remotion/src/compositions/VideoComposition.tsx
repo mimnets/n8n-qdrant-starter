@@ -1,27 +1,22 @@
-import { AbsoluteFill, Img, Audio, useCurrentFrame, useVideoConfig, interpolate, Easing, spring, Sequence } from "remotion";
+import {
+  AbsoluteFill, Img, Audio, useCurrentFrame, useVideoConfig,
+  interpolate, Easing, spring, Sequence, springTiming,
+} from "remotion";
+import { createTikTokStyleCaptions } from "@remotion/captions";
 
-// Ken Burns effect presets
+// ================================================================
+// Types
+// ================================================================
 type KenBurnsEffect =
-  | "zoomIn"
-  | "zoomOut"
-  | "slideLeft"
-  | "slideRight"
-  | "slideUp"
-  | "slideDown"
-  | "zoomInFast"
-  | "zoomOutFast";
+  | "zoomIn" | "zoomOut" | "slideLeft" | "slideRight"
+  | "slideUp" | "slideDown" | "zoomInFast" | "zoomOutFast";
 
-interface Transition {
-  in?: string;
-  out?: string;
-}
+type TextAnimation = "none" | "fadeIn" | "slideUp" | "scale" | "typewriter";
+type CaptionStyle = "static" | "tiktok";
 
-interface FontStyle {
-  family?: string;
-  size?: number;
-  color?: string;
-  weight?: number;
-}
+interface Transition { in?: string; out?: string; }
+
+interface FontStyle { family?: string; size?: number; color?: string; weight?: number; }
 
 interface TextAsset {
   type: "text";
@@ -29,18 +24,12 @@ interface TextAsset {
   font?: FontStyle;
   alignment?: { horizontal?: string; vertical?: string };
   background?: string;
+  captionStyle?: CaptionStyle;
+  combineMs?: number;
 }
 
-interface ImageAsset {
-  type: "image";
-  src?: string;
-}
-
-interface HtmlAsset {
-  type: "html";
-  html?: string;
-}
-
+interface ImageAsset { type: "image"; src?: string; }
+interface HtmlAsset { type: "html"; html?: string; }
 type Asset = TextAsset | ImageAsset | HtmlAsset;
 
 interface Clip {
@@ -49,367 +38,344 @@ interface Clip {
   length: number;
   effect?: KenBurnsEffect;
   transition?: Transition;
-  position?: string;
-  offset?: { x?: number; y?: number };
+  textAnimation?: TextAnimation;
 }
 
-interface Track {
-  clips: Clip[];
-}
+interface Track { clips: Clip[]; }
+interface Timeline { background?: string; soundtrack?: { src?: string; effect?: string; volume?: number }; tracks: Track[]; }
+interface Output { format?: string; resolution?: string; fps?: number; }
+interface RenderRequest { timeline: Timeline; output: Output; }
 
-interface Timeline {
-  background?: string;
-  soundtrack?: { src?: string; effect?: string; volume?: number };
-  tracks: Track[];
-}
-
-interface Output {
-  format?: string;
-  resolution?: string;
-  fps?: number;
-}
-
-interface RenderRequest {
-  timeline: Timeline;
-  output: Output;
-}
-
-// Resolution presets
-const RESOLUTIONS: Record<string, { width: number; height: number }> = {
-  preview: { width: 512, height: 288 },
-  mobile: { width: 640, height: 360 },
-  sd: { width: 1024, height: 576 },
-  hd: { width: 1280, height: 720 },
-  "1080": { width: 1920, height: 1080 },
-  "4k": { width: 3840, height: 2160 },
-};
-
-// Ken Burns CSS transform generator
-function getKenBurnsTransform(
-  effect: KenBurnsEffect | undefined,
-  frame: number,
-  totalFrames: number
-): React.CSSProperties {
-  const progress = frame / Math.max(totalFrames - 1, 1);
-  const easedProgress = Easing.inOut(Easing.ease)(Math.min(progress, 1));
-
-  switch (effect) {
-    case "zoomIn":
-    case "zoomInFast": {
-      const speed = effect === "zoomInFast" ? 2.0 : 1.0;
-      const scale = interpolate(
-        easedProgress,
-        [0, 1],
-        [1, 1 + 0.3 * speed],
-        { extrapolateRight: "clamp" }
-      );
-      return { transform: `scale(${scale})` };
-    }
-    case "zoomOut":
-    case "zoomOutFast": {
-      const speed = effect === "zoomOutFast" ? 2.0 : 1.0;
-      const scale = interpolate(
-        easedProgress,
-        [0, 1],
-        [1 + 0.3 * speed, 1],
-        { extrapolateRight: "clamp" }
-      );
-      return { transform: `scale(${scale})` };
-    }
-    case "slideLeft": {
-      const x = interpolate(easedProgress, [0, 1], [0, -100], {
-        extrapolateRight: "clamp",
-      });
-      return { transform: `translateX(${x}px)` };
-    }
-    case "slideRight": {
-      const x = interpolate(easedProgress, [0, 1], [0, 100], {
-        extrapolateRight: "clamp",
-      });
-      return { transform: `translateX(${x}px)` };
-    }
-    case "slideUp": {
-      const y = interpolate(easedProgress, [0, 1], [0, -100], {
-        extrapolateRight: "clamp",
-      });
-      return { transform: `translateY(${y}px)` };
-    }
-    case "slideDown": {
-      const y = interpolate(easedProgress, [0, 1], [0, 100], {
-        extrapolateRight: "clamp",
-      });
-      return { transform: `translateY(${y}px)` };
-    }
-    default:
-      return {};
-  }
-}
-
-// Resolve text position — uses absolute positioning for reliability
-function getTextPosition(
-  alignment?: { horizontal?: string; vertical?: string },
-  _position?: string
+// ================================================================
+// Helpers
+// ================================================================
+function getTextPos(
+  alignment?: TextAsset["alignment"]
 ): React.CSSProperties {
   const h = alignment?.horizontal ?? "center";
   const v = alignment?.vertical ?? "bottom";
-
-  // Map horizontal alignment to CSS
   let left: string | number = "50%";
-  let transformX = "-50%";
-  if (h === "left") { left = 40; transformX = "0"; }
-  else if (h === "right") { left = "auto"; transformX = "0"; }
-
-  // Map vertical alignment to CSS
+  let tx = "-50%";
+  if (h === "left") { left = 40; tx = "0"; }
+  else if (h === "right") { left = "auto"; tx = "0"; }
   let bottom: string | number | undefined;
   let top: string | number | undefined;
-  let transformY = "0";
-  if (v === "bottom") {
-    bottom = 80;  // 80px from bottom edge
-    transformY = "0";
-  } else if (v === "top") {
-    top = 80;
-    transformY = "0";
-  } else {
-    // center
-    top = "50%";
-    transformY = "-50%";
-  }
-
+  let ty = "0";
+  if (v === "bottom") { bottom = 80; }
+  else if (v === "top") { top = 80; }
+  else { top = "50%"; ty = "-50%"; }
   return {
     position: "absolute",
     left: h === "right" ? "auto" : left,
     right: h === "right" ? 40 : "auto",
-    top: top ?? "auto",
-    bottom: bottom ?? "auto",
-    transform: `translate(${transformX}, ${transformY})`,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    width: "auto",
-    height: "auto",
-    maxWidth: "80%",
-    maxHeight: "auto",
+    top: top ?? "auto", bottom: bottom ?? "auto",
+    transform: `translate(${tx}, ${ty})`,
+    display: "flex", justifyContent: "center", alignItems: "center",
+    width: "auto", height: "auto", maxWidth: "80%",
   };
 }
 
-// ================================================================
-// Image Scene with Ken Burns
-// ================================================================
-const ImageScene: React.FC<{
-  clip: Clip;
-  totalFrames: number;
-}> = ({ clip, totalFrames }) => {
-  const frame = useCurrentFrame();
-  const kenBurns = getKenBurnsTransform(
-    clip.effect as KenBurnsEffect,
-    frame,
-    totalFrames
-  );
+function getKenBurns(effect: KenBurnsEffect | undefined, frame: number, total: number): React.CSSProperties {
+  const p = frame / Math.max(total - 1, 1);
+  const ep = Easing.inOut(Easing.ease)(Math.min(p, 1));
+  switch (effect) {
+    case "zoomIn": case "zoomInFast": {
+      const s = effect === "zoomInFast" ? 2 : 1;
+      return { transform: `scale(${interpolate(ep, [0,1], [1, 1+0.3*s])})` };
+    }
+    case "zoomOut": case "zoomOutFast": {
+      const s = effect === "zoomOutFast" ? 2 : 1;
+      return { transform: `scale(${interpolate(ep, [0,1], [1+0.3*s, 1])})` };
+    }
+    case "slideLeft": return { transform: `translateX(${interpolate(ep,[0,1],[0,-100])}px)` };
+    case "slideRight": return { transform: `translateX(${interpolate(ep,[0,1],[0,100])}px)` };
+    case "slideUp": return { transform: `translateY(${interpolate(ep,[0,1],[0,-100])}px)` };
+    case "slideDown": return { transform: `translateY(${interpolate(ep,[0,1],[0,100])}px)` };
+    default: return {};
+  }
+}
 
+/** Generate estimated word-level captions from plain text + total duration */
+function textToCaptions(text: string, totalDurationMs: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const msPerWord = totalDurationMs / words.length;
+  return words.map((word, i) => ({
+    text: i === 0 ? word : ` ${word}`,
+    startMs: Math.round(i * msPerWord),
+    endMs: Math.round((i + 1) * msPerWord),
+    timestampMs: Math.round(i * msPerWord),
+    confidence: null as number | null,
+  }));
+}
+
+// ================================================================
+// Animated text style helper
+// ================================================================
+function getTextAnimationStyle(
+  animation: TextAnimation | undefined,
+  frame: number,
+  totalFrames: number,
+): React.CSSProperties {
+  if (!animation || animation === "none" || totalFrames <= 0) return {};
+  const progress = Math.min(frame / totalFrames, 1);
+  switch (animation) {
+    case "fadeIn":
+      return { opacity: interpolate(progress, [0, 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) };
+    case "slideUp":
+      return {
+        opacity: interpolate(progress, [0, 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+        transform: `translateY(${interpolate(progress, [0, 0.4], [40, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
+      };
+    case "scale":
+      return {
+        opacity: interpolate(progress, [0, 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+        transform: `scale(${interpolate(progress, [0, 0.4], [0.8, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })})`,
+      };
+    case "typewriter":
+      return { opacity: 1 };
+    default: return {};
+  }
+}
+
+// ================================================================
+// Image Scene
+// ================================================================
+const ImageScene: React.FC<{ clip: Clip; totalFrames: number }> = ({ clip, totalFrames }) => {
+  const frame = useCurrentFrame();
+  const kb = getKenBurns(clip.effect as KenBurnsEffect, frame, totalFrames);
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
-      <Img
-        src={clip.asset.src!}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          ...kenBurns,
-        }}
-      />
+      <Img src={clip.asset.src!} style={{ width: "100%", height: "100%", objectFit: "cover", ...kb }} />
     </AbsoluteFill>
   );
 };
 
 // ================================================================
-// Text/Caption Overlay
+// Static Text Overlay (with animations)
 // ================================================================
-const TextOverlay: React.FC<{
-  clip: Clip;
-  width: number;
-  height: number;
-}> = ({ clip, width, height }) => {
+const TextOverlay: React.FC<{ clip: Clip; width: number; height: number; clipFrames?: number }> = ({
+  clip, width, height, clipFrames = 0,
+}) => {
+  const frame = useCurrentFrame();
   const asset = clip.asset as TextAsset;
   const font = asset.font ?? {};
   const align = asset.alignment ?? {};
+  const animStyle = getTextAnimationStyle(clip.textAnimation as TextAnimation | undefined, frame, clipFrames);
 
-  const posStyle = getTextPosition(align, clip.position);
+  if (asset.captionStyle === "tiktok") {
+    return <TikTokCaptionOverlay clip={clip} width={width} height={height} />;
+  }
 
   return (
-    <AbsoluteFill
-      style={{
-        ...posStyle,
-        pointerEvents: "none",
-      }}
-    >
-      <div
-        style={{
-          fontFamily: font.family ?? "sans-serif",
-          fontSize: (font.size ?? 42) * (width / 1920),
-          color: font.color ?? "#FFFFFF",
-          fontWeight: font.weight ?? 400,
-          textAlign: "center",
-          textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
-          maxWidth: "80%",
-          lineHeight: 1.4,
-          padding: "12px 24px",
-          background: asset.background ?? "rgba(0,0,0,0.3)",
-          borderRadius: "8px",
-        }}
-      >
-        {asset.text}
+    <AbsoluteFill style={{ ...getTextPos(align), pointerEvents: "none" }}>
+      <div style={{
+        fontFamily: font.family ?? "sans-serif",
+        fontSize: (font.size ?? 42) * (width / 1920),
+        color: font.color ?? "#FFFFFF",
+        fontWeight: font.weight ?? 400,
+        textAlign: "center",
+        textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
+        maxWidth: "80%", lineHeight: 1.4,
+        padding: "12px 24px",
+        background: asset.background ?? "rgba(0,0,0,0.3)",
+        borderRadius: "8px",
+        ...animStyle,
+      }}>
+        {clip.textAnimation === "typewriter"
+          ? asset.text?.slice(0, Math.floor(frame / clipFrames * (asset.text?.length ?? 0))) ?? ""
+          : asset.text}
       </div>
     </AbsoluteFill>
   );
 };
 
 // ================================================================
-// HTML Scene (rich text with background)
+// TikTok-Style Captions (word-by-word highlight)
 // ================================================================
-const HtmlScene: React.FC<{
-  clip: Clip;
-  width: number;
-  height: number;
-}> = ({ clip, width, height }) => {
+const TikTokCaptionOverlay: React.FC<{ clip: Clip; width: number; height: number }> = ({ clip, width, height }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const asset = clip.asset as TextAsset;
+  const align = asset.alignment ?? {};
+  const combineMs = asset.combineMs ?? 400; // word-by-word by default
+
+  // Generate estimated captions from plain text
+  const totalMs = clip.length * 1000;
+  const captions = textToCaptions(asset.text ?? "", totalMs);
+
+  // Create TikTok-style pages
+  const { pages } = createTikTokStyleCaptions({
+    captions,
+    combineTokensWithinMilliseconds: combineMs,
+  });
+
+  const timeMs = (frame / fps) * 1000;
+  const currentPage = pages.find(
+    (p) => timeMs >= p.startMs && timeMs < p.startMs + (p.durationMs ?? 0)
+  );
+
+  if (!currentPage) return null;
+
   return (
-    <AbsoluteFill
-      style={{
-        width,
-        height,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{ width: "100%", height: "100%" }}
-        dangerouslySetInnerHTML={{
-          __html: (clip.asset as HtmlAsset).html ?? "",
-        }}
-      />
+    <AbsoluteFill style={{ ...getTextPos(align), pointerEvents: "none" }}>
+      <div style={{
+        position: "relative",
+        display: "flex", flexWrap: "wrap",
+        justifyContent: "center", alignItems: "center",
+        gap: "2px",
+        fontFamily: (asset.font?.family ?? "sans-serif") as string,
+        fontSize: ((asset.font?.size ?? 48) * (width / 1920)) as number,
+        fontWeight: (asset.font?.weight ?? 700) as number,
+        whiteSpace: "pre-wrap",
+        textAlign: "center",
+        lineHeight: 1.5,
+      }}>
+        {currentPage.tokens.map((token, i) => {
+          const isActive = timeMs >= token.fromMs && timeMs < token.toMs;
+          return (
+            <span
+              key={i}
+              style={{
+                color: isActive ? "#FFD700" : (asset.font?.color ?? "#FFFFFF"),
+                textShadow: isActive
+                  ? "0 0 12px #FFD700, 0 0 24px #FFD700, 2px 2px 4px rgba(0,0,0,0.8)"
+                  : "2px 2px 4px rgba(0,0,0,0.8)",
+                background: isActive ? "rgba(0,0,0,0.5)" : "transparent",
+                borderRadius: "4px",
+                padding: isActive ? "2px 4px" : "2px 0",
+                transition: "all 0.05s ease",
+                whiteSpace: "pre",
+              }}
+            >
+              {token.text}
+            </span>
+          );
+        })}
+      </div>
     </AbsoluteFill>
   );
 };
 
 // ================================================================
+// HTML Scene
+// ================================================================
+const HtmlScene: React.FC<{ clip: Clip; width: number; height: number }> = ({ clip, width, height }) => (
+  <AbsoluteFill style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ width: "100%", height: "100%" }}
+      dangerouslySetInnerHTML={{ __html: (clip.asset as HtmlAsset).html ?? "" }} />
+  </AbsoluteFill>
+);
+
+// ================================================================
 // Audio Clip
 // ================================================================
-const AudioClip: React.FC<{
-  src: string;
-  volume?: number;
-  startInFrame: number;
-  durationInFrames: number;
-}> = ({ src, volume = 1 }) => {
-  return <Audio src={src} volume={volume} />;
+const AudioClip: React.FC<{ src: string; volume?: number }> = ({ src, volume = 1 }) => (
+  <Audio src={src} volume={volume} />
+);
+
+// ================================================================
+// Crossfade between clips
+// ================================================================
+const CrossfadeLayer: React.FC<{
+  clips: Clip[];
+  currentTime: number;
+  fps: number;
+  width: number;
+  height: number;
+}> = ({ clips, currentTime, fps, width, height }) => {
+  // Find all clips active at this moment
+  const activeClips = clips.filter(
+    (c) => c.asset.type !== "text" && c.asset.type !== "audio" &&
+      currentTime >= c.start && currentTime < c.start + c.length
+  );
+
+  if (activeClips.length === 0) return null;
+  if (activeClips.length === 1) {
+    const c = activeClips[0];
+    const cf = Math.round(c.length * fps);
+    return <ImageScene clip={c} totalFrames={cf} />;
+  }
+
+  // Multiple clips overlapping = crossfade
+  return (
+    <>
+      {activeClips.map((c, i) => {
+        const cf = Math.round(c.length * fps);
+        const localTime = currentTime - c.start;
+        let opacity = 1;
+        if (i === activeClips.length - 1) {
+          // Latest clip fades in
+          opacity = interpolate(localTime, [0, 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        } else if (localTime < c.length - 0.3) {
+          // Earlier clip fades out at end
+          const remaining = c.length - localTime;
+          opacity = interpolate(remaining, [0, 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        }
+        return (
+          <div key={i} style={{ position: "absolute", inset: 0, opacity }}>
+            <ImageScene clip={c} totalFrames={cf} />
+          </div>
+        );
+      })}
+    </>
+  );
 };
 
 // ================================================================
 // Main Composition
 // ================================================================
-export const VideoComposition: React.FC<RenderRequest> = ({
-  timeline,
-  output,
-}) => {
+export const VideoComposition: React.FC<RenderRequest> = ({ timeline, output }) => {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
-
-  // Calculate total duration from tracks
-  const totalDuration = timeline.tracks.reduce((maxDur, track) => {
-    const trackEnd = track.clips.reduce((end, c) => Math.max(end, c.start + c.length), 0);
-    return Math.max(maxDur, trackEnd);
-  }, 0);
-
-  const totalFrames = Math.round(totalDuration * fps);
-
-  // Separate audio and video tracks
-  const videoClips = timeline.tracks.flatMap((track) =>
-    track.clips.filter((c) => c.asset.type !== "audio")
-  );
-  const audioClips = timeline.tracks.flatMap((c) =>
-    c.clips?.filter((c) => c.asset.type === "audio") ?? []
-  );
-
-  // Find which clip is active at current frame
   const currentTime = frame / fps;
-  const activeClip = videoClips.find(
+
+  // Separate clips by type
+  const videoClips = timeline.tracks.flatMap((t) =>
+    t.clips.filter((c) => c.asset.type !== "audio")
+  );
+  const audioClips = timeline.tracks.flatMap((t) =>
+    t.clips.filter((c) => c.asset.type === "audio")
+  );
+
+  // Active visual clips (for crossfade) and text clips
+  const visualClips = videoClips.filter((c) => c.asset.type !== "text");
+  const textClips = videoClips.filter(
+    (c) => c.asset.type === "text" &&
+      currentTime >= c.start && currentTime < c.start + c.length
+  );
+
+  // Black background if nothing active
+  const hasVideo = visualClips.some(
     (c) => currentTime >= c.start && currentTime < c.start + c.length
   );
-
-  if (!activeClip) {
+  if (!hasVideo && textClips.length === 0) {
     return <AbsoluteFill style={{ background: timeline.background ?? "#000" }} />;
   }
 
-  const clipFrames = Math.round(activeClip.length * fps);
-  const clipStartFrame = Math.round(activeClip.start * fps);
-  const localFrame = frame - clipStartFrame;
-
-  // Fade transition at start/end of clip
-  let opacity = 1;
-  if (activeClip.transition?.in && localFrame < 10) {
-    opacity = interpolate(localFrame, [0, 10], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    });
-  }
-  if (activeClip.transition?.out && clipFrames - localFrame < 10) {
-    const remaining = clipFrames - localFrame;
-    opacity = interpolate(remaining, [0, 10], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    });
-  }
-
   return (
-    <AbsoluteFill
-      style={{
-        background: timeline.background ?? "#000",
-        opacity,
-      }}
-    >
-      {/* Image/HTML content */}
-      {activeClip.asset.type === "image" && (
-        <ImageScene clip={activeClip} totalFrames={clipFrames} />
-      )}
-      {activeClip.asset.type === "html" && (
-        <HtmlScene clip={activeClip} width={width} height={height} />
-      )}
+    <AbsoluteFill style={{ background: timeline.background ?? "#000" }}>
+      {/* Visual content with crossfade */}
+      <CrossfadeLayer clips={visualClips} currentTime={currentTime} fps={fps} width={width} height={height} />
 
-      {/* Text overlay (always on top) */}
-      {videoClips
-        .filter(
-          (c) =>
-            c.asset.type === "text" &&
-            currentTime >= c.start &&
-            currentTime < c.start + c.length
-        )
-        .map((c, i) => (
-          <TextOverlay key={i} clip={c} width={width} height={height} />
-        ))}
+      {/* Text overlays always on top */}
+      {textClips.map((c, i) => {
+        const clipFrames = Math.round(c.length * fps);
+        return <TextOverlay key={i} clip={c} width={width} height={height} clipFrames={clipFrames} />;
+      })}
 
-      {/* Soundtrack (plays throughout) */}
+      {/* Soundtrack */}
       {timeline.soundtrack?.src && (
-        <Audio
-          src={timeline.soundtrack.src}
-          volume={timeline.soundtrack.volume ?? 0.15}
-        />
+        <Audio src={timeline.soundtrack.src} volume={timeline.soundtrack.volume ?? 0.15} />
       )}
 
-      {/* Audio clips (scene-specific audio) */}
+      {/* Audio clips */}
       {audioClips.map((c, i) => {
-        const clipStartInFrames = Math.round(c.start * fps);
-        const clipDurationInFrames = Math.round(c.length * fps);
+        const from = Math.round(c.start * fps);
+        const dur = Math.round(c.length * fps);
         return (
-          <Sequence
-            key={i}
-            from={clipStartInFrames}
-            durationInFrames={clipDurationInFrames}
-          >
-            <AudioClip
-              src={c.asset.src ?? ""}
-              volume={1}
-              startInFrame={0}
-              durationInFrames={clipDurationInFrames}
-            />
+          <Sequence key={i} from={from} durationInFrames={dur}>
+            <AudioClip src={c.asset.src ?? ""} volume={1} />
           </Sequence>
         );
       })}

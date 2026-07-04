@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Production-ready AI automation stack — n8n workflows, Qdrant vector search,
-> self-hosted file upload, video rendering with Ken Burns effects, and
+> self-hosted file upload, programmatic video rendering with Remotion, and
 > text-to-speech. All services in one `docker compose up`.
 
 ## 📖 Overview
@@ -14,7 +14,7 @@ A lightweight, self-hosted stack combining:
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
 - **[File Upload API](https://hub.docker.com/r/mimnets/n8n-file-upload)** — self-hosted file storage for images, audio, video, documents
-- **[Editframe](https://editframe.com)** — declarative HTML/CSS video render engine with text, images, video, audio, captions, and transitions
+- **[Remotion Video Render](https://remotion.dev)** — React-powered programmatic video engine with Ken Burns effects, text overlays, TikTok-style captions, crossfade transitions, and multi-track audio
 - **[Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI)** — text-to-speech with 35+ voices (OpenAI-compatible API)
 
 ## 🏗️ Architecture
@@ -26,21 +26,14 @@ A lightweight, self-hosted stack combining:
 └──────────────┘     └──────┬───────┘     └─────────────┘
       :5432                 │                   :6333
                             │
-              ┌─────────────┼──────────────────┐
-              │             │                  │
-    ┌─────────┴────┐  ┌────┴──────────┐       │
-    │ File Upload  │  │  Editframe    │       │
-    │ (REST, 8010) │  │ (REST, 3000)  │       │
-    │  file store  │  │  HTML/CSS     │       │
-    └──────────────┘  │   Videos      │       │
-                      └───────┬───────┘       │
-                              │               │
-                              │         ┌─────┴──────┐
-                              │         │ Kokoro TTS │
-                              │         │ (REST,8880)│
-                              │         │ TTS/Speech │
-                              │         │ 35+ voices │
-                              │         └────────────┘
+              ┌─────────────┼───────────────────────┐
+              │             │                       │
+    ┌─────────┴────┐  ┌────┴──────────┐   ┌────────┴───────┐
+    │ File Upload  │  │   Remotion    │   │   Kokoro TTS   │
+    │ (REST, 8010) │  │ (REST, 3000)  │   │  (REST, 8880)  │
+    │  file store  │  │   React/SSR   │   │  TTS / Speech  │
+    └──────────────┘  │   Video Gen   │   │   35+ voices   │
+                      └───────────────┘   └────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -69,8 +62,9 @@ docker compose ps
 | **Qdrant Dashboard** | `http://localhost:6333/dashboard` |
 | **File Upload API** | `http://localhost:8010` |
 | **File Upload Admin** | `http://localhost:8010/admin` |
-| **Editframe API** | `http://localhost:3000` |
-| **Editframe Health** | `http://localhost:3000/health` |
+| **Remotion API** | `http://localhost:3000` |
+| **Remotion API Builder** | `http://localhost:3000/tools/api-builder` |
+| **Remotion Health** | `http://localhost:3000/health` |
 | **Kokoro TTS** | `http://localhost:8880` |
 | **Kokoro TTS Swagger** | `http://localhost:8880/docs` |
 | **Kokoro TTS Web UI** | `http://localhost:8880/web` |
@@ -83,147 +77,156 @@ docker compose ps
 | `n8n` | `n8nio/n8n:latest` | `5678` | ✅ healthcheck |
 | `qdrant` | `qdrant/qdrant:latest` | `6333` | ✅ |
 | `file-upload` | *local build* — `file-upload-server/Dockerfile` | `8010` | ✅ healthcheck |
-| `editframe` | *local build* — `editframe-server/Dockerfile` | `3000` | ✅ healthcheck |
+| `remotion` | *local build* — `remotion/Dockerfile` | `3000` | ✅ healthcheck |
 | `kokoro-tts` | `ghcr.io/remsky/kokoro-fastapi-cpu:latest` | `8880` | ✅ healthcheck |
 
-**Note:** Editframe and file-upload are built from source locally. The first `docker compose up -d` will build these automatically.
-
-## 📁 File Upload API
-
-Self-hosted file storage for images, audio (mp3, wav, ogg, flac), video, documents, and archives.
-
-### From n8n workflows
-
-```
-POST http://file-upload:8001/upload
-Body Type: Form-Data
-  → file: {{ $json.binaryPropertyName }}  (mode: "From Binary Property")
-```
-
-### All endpoints
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/admin` | optional | Web-based admin panel |
-| `POST` | `/upload` | optional | Upload a file (multipart/form-data) |
-| `GET` | `/files/{filename}` | no | Serve an uploaded file |
-| `GET` | `/files` | yes | List all uploaded files (JSON) |
-| `DELETE` | `/files/{filename}` | yes | Delete an uploaded file |
-
-Legacy `/images/` endpoints also work for backward compatibility.
+**Note:** Remotion and file-upload are built from source locally. The first `docker compose up -d` will build these automatically.
 
 ---
 
-## 🎥 Remotion — Video Rendering (React-based)
+## 🎥 Remotion — Programmatic Video Rendering
 
 [![Remotion](https://img.shields.io/badge/Remotion-4.0-blue)](https://remotion.dev)
 
-Remotion is a programmatic video render engine powered by React. It replaces CutEngine with a more reliable, well-maintained, and actively developed framework.
+Remotion is a React-powered programmatic video engine. You describe your video as React components — Remotion renders each frame to a real MP4 video.
 
-### Features
+### What You Can Do
 
-- **Ken Burns zoom effects** — zoomIn, zoomOut, slideLeft, slideRight, slideUp, slideDown
-- **Text overlays** — any system font, any position, with background/shadow styling
-- **HTML scenes** — rich HTML with full CSS for text-heavy videos
-- **Audio** — soundtrack + per-scene audio clips
-- **All standard resolutions** — preview, mobile, sd, hd, 1080, 4k
-- **Aspect ratios** — 16:9, 9:16, 1:1, 4:5, 4:3
+| Feature | Description |
+|---------|-------------|
+| 🖼️ **Multiple images** with Ken Burns effects | zoomIn, zoomOut, slideLeft, slideRight, slideUp, slideDown |
+| 📝 **Text overlays** | Position at bottom (captions), center, or top. Custom font, color, weight |
+| ✨ **Animated text entrances** | Fade In, Slide Up, Scale In, Typewriter — per text clip |
+| 🔡 **TikTok-style captions** | Word-by-word gold highlighting — looks like TikTok/Reels |
+| 🎵 **Multi-track audio** | Scene-specific audio clips + background soundtrack |
+| 🔄 **Crossfade transitions** | Automatic dissolve between overlapping image clips |
+| 🎬 **Resolutions** | preview, mobile, SD, HD, **1080p**, **Vertical/Reels**, 4K |
+| 📐 **Aspect ratios** | 16:9 (horizontal), 9:16 (vertical/reels) |
+| 🖌️ **HTML scenes** | Rich HTML with full CSS for text-heavy layouts |
 
 ### API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
-| `POST` | `/edit/v1/render` | Submit a render job |
-| `GET` | `/edit/v1/render/{id}` | Get render status |
-| `GET` | `/serve/v1/assets/{id}/output.mp4` | Download rendered video |
+| `POST` | `/edit/v1/render` | Submit a render job (returns render ID) |
+| `GET` | `/edit/v1/render/{id}` | Get render status — `"done"` when video ready |
+| `GET` | `/serve/v1/assets/{id}/output.mp4` | Download rendered MP4 |
+| `GET` | `/tools/api-builder` | Visual JSON builder UI |
 
-### From n8n Workflows — Zoom + Audio + Captions
+---
 
-**1. Submit a render**
+## 🔌 n8n Community Node — `n8n-nodes-remotion-render`
 
+[![npm](https://img.shields.io/npm/v/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
+[![npm](https://img.shields.io/npm/dm/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
+
+This project includes a custom n8n community node that wraps the entire Remotion API into a single drag-and-drop node. No need to manually construct JSON payloads or poll for completion.
+
+### Install
+
+In n8n: **Settings → Community Nodes → Install** → enter `n8n-nodes-remotion-render`
+
+Or if running n8n in Docker with this stack, add to `docker-compose.yml`:
+
+```yaml
+n8n:
+  environment:
+    - N8N_CUSTOM_EXTENSIONS=/home/node/custom-nodes
+  volumes:
+    - ./n8n-nodes-remotion-render:/home/node/custom-nodes/n8n-nodes-remotion-render
 ```
-POST http://remotion:3000/edit/v1/render
-Body (JSON):
+
+### Setup Credential
+
+1. **n8n → Credentials → Add New → Remotion Render API - mimnets**
+2. **Server URL**: `http://remotion:3000`
+3. Leave API Key blank
+4. **Save**
+
+### Usage — Manual Mode
+
+After adding the node to your workflow:
+
+1. **Add Images** — set URL, start time, length, Ken Burns effect, fade in/out
+2. **Add Text Overlays** — enter text, set **Vertical Position → Bottom** for captions
+3. Choose **Animation → Fade In / Slide Up / Scale / Typewriter** for text entrance
+4. Set **Caption Style → TikTok Style** for word-by-word highlighting
+5. **Add Audio Clips** or fill in **Soundtrack** for background music
+6. Set **Resolution → 1080** or **Vertical** for TikTok/Reels
+
+### Usage — Input JSON Mode (Dynamic Data)
+
+Connect any upstream node that outputs this structure:
+
+```json
 {
-  "timeline": {
-    "background": "#000000",
-    "tracks": [
-      {
-        "clips": [{
-          "asset": {
-            "type": "image",
-            "src": "{{ $('image-path').item.json.url }}"
-          },
-          "start": 0,
-          "length": {{ $('audio-code').item.json.video_length }},
-          "effect": "zoomIn"
-        }]
-      },
-      {
-        "clips": [{
-          "asset": {
-            "type": "audio",
-            "src": "{{ $('audio-path').item.json.url }}"
-          },
-          "start": 0,
-          "length": {{ $('audio-code').item.json.video_length }}
-        }]
-      },
-      {
-        "clips": [{
-          "asset": {
-            "type": "text",
-            "text": "{{ $json.Voiceover_Text }}",
-            "font": { "family": "sans-serif", "size": 48, "color": "#ffffff" }
-          },
-          "start": 0,
-          "length": {{ $('audio-code').item.json.video_length }},
-          "position": "bottom"
-        }]
-      }
-    ]
-  },
-  "output": { "format": "mp4", "resolution": "1080" }
+  "images": [
+    { "src": "https://...", "start": 0, "length": 8, "effect": "zoomIn" }
+  ],
+  "texts": [
+    { "text": "Hello!", "start": 0, "length": 8, "vertical": "bottom", "captionStyle": "tiktok" }
+  ],
+  "soundtrack": { "src": "https://...", "volume": 0.15 },
+  "resolution": "1080",
+  "fps": 25
 }
 ```
 
-→ Returns `{"success": true, "response": {"id": "abc123", "status": "rendering"}}`
+### Output
 
-**2. Poll for status**
-
-```
-GET http://remotion:3000/edit/v1/render/{id}
-```
-→ Status: `rendering` → `done`
-
-**3. Download**
-
-```
-GET http://remotion:3000/serve/v1/assets/{id}/output.mp4
+```json
+{
+  "renderId": "abc123",
+  "status": "done",
+  "videoUrl": "http://remotion:3000/serve/v1/assets/abc123/output.mp4"
+}
 ```
 
-### Supported Ken Burns Effects
+---
 
-| Effect | Description |
-|--------|-------------|
-| `zoomIn` | Slow zoom into center |
-| `zoomOut` | Slow zoom out from center |
-| `slideLeft` | Pan from right to left |
-| `slideRight` | Pan from left to right |
-| `slideUp` | Pan from bottom to top |
-| `slideDown` | Pan from top to bottom |
-| `zoomInFast` | Fast zoom in |
-| `zoomOutFast` | Fast zoom out |
+## 🎬 n8n Workflow Examples
 
-### Supported Asset Types
+### Example 1: Simple Image + Caption Video
 
-| Type | Description |
-|------|-------------|
-| `image` | Image (JPEG, PNG, WebP) |
-| `text` | Text overlay with font styling |
-| `html` | Rich HTML/CSS content |
-| `audio` | Audio file |
+```
+[Manual Trigger] → [Remotion Render Node] → [HTTP Request to download video]
+```
+
+Configure node:
+- **Image**: URL, start 0, length 10, Effect: zoomIn
+- **Text**: "My First Video", start 0, length 10, Vertical: Bottom, Animation: Fade In
+- **Soundtrack**: background music URL
+- **Resolution**: 1080
+
+### Example 2: Multi-image TikTok-style Video
+
+```
+[Code Node] → [Remotion Render Node] → [HTTP Request Download]
+```
+
+Code node outputs:
+```javascript
+const images = [
+  { src: "https://...img1.jpg", start: 0, length: 5, effect: "zoomIn" },
+  { src: "https://...img2.jpg", start: 4, length: 5, effect: "slideLeft" },
+  { src: "https://...img3.jpg", start: 8, length: 5, effect: "zoomOut" },
+];
+const texts = [{
+  text: "Amazing nature moments",
+  start: 0, length: 13,
+  vertical: "bottom", captionStyle: "tiktok", combineMs: 400
+}];
+return { images, texts, resolution: "vertical", fps: 25 };
+```
+
+### Example 3: AI Pipeline — Script → TTS → Video
+
+```
+[Code Node with script] → [Kokoro TTS] → [Upload Audio]
+    → [Generate Image via AI] → [Upload Image]
+    → [Remotion Render] → [Download Video] → [Publish]
+```
 
 ---
 
@@ -231,26 +234,12 @@ GET http://remotion:3000/serve/v1/assets/{id}/output.mp4
 
 [![Kokoro FastAPI](https://img.shields.io/badge/Kokoro--FastAPI-5k%E2%98%85-brightgreen)](https://github.com/remsky/Kokoro-FastAPI)
 
-Kokoro FastAPI is a Dockerized FastAPI wrapper for the [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) text-to-speech model. OpenAI-compatible API with 35+ voices.
+Dockerized FastAPI wrapper for [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M). OpenAI-compatible API with 35+ voices.
 
-### API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/audio/voices` | List available voices |
-| `POST` | `/v1/audio/speech` | Generate speech (OpenAI-compatible) |
-| `POST` | `/v1/audio/voices/combine` | Create weighted voice blend |
-| `POST` | `/dev/captioned_speech` | Speech with word-level timestamps |
-
-Swagger UI: `http://localhost:8880/docs`  \
-Web UI: `http://localhost:8880/web`
-
-### From n8n Workflows
+### From n8n
 
 ```
 POST http://kokoro-tts:8880/v1/audio/speech
-Content-Type: application/json
-Body:
 {
   "model": "kokoro",
   "input": "Your text to speak",
@@ -258,41 +247,10 @@ Body:
   "response_format": "mp3"
 }
 ```
-→ Returns the audio file
 
-**Voices:** `af_bella`, `af_sky`, `af_alloy`, `af_jessica`, `am_adam`, `am_michael`, `am_echo`, `bf_emma`, `bm_george`, and more (English, Japanese, Chinese, Korean, French, Spanish, Italian, Portuguese, Hindi + blends).
+**Voices:** `af_bella`, `af_sky`, `af_alloy`, `af_jessica`, `am_adam`, `am_michael`, `am_echo`, `bf_emma`, `bm_george` + Japanese, Chinese, Korean, French, Spanish, Italian, Portuguese, Hindi + voice blends.
 
-**Voice blending:**
-```json
-{ "voice": "af_bella(2)+af_sky(1)", ... }
-```
-→ 67% Bella, 33% Sky
-
-### Supported Output Formats
-
-| Format | Content Type |
-|--------|-------------|
-| `mp3` | `audio/mpeg` |
-| `wav` | `audio/wav` |
-| `opus` | `audio/opus` |
-| `flac` | `audio/flac` |
-| `pcm` | `audio/pcm` |
-
----
-
-## 🔗 Full Pipeline: Image → TTS → Video
-
-A complete n8n workflow pattern:
-
-```
-1. Cloudflare Workers → Generate image (FLUX)
-2. Code node → Convert to binary
-3. File Upload API → Upload image, get URL
-4. Kokoro TTS → Generate voiceover, upload audio
-5. Remotion → Submit render with image + audio + captions + zoom
-6. Poll render status → Download final MP4
-7. Upload to File Upload API → Permanent file URL
-```
+**Voice blending:** `"voice": "af_bella(2)+af_sky(1)"` → 67% Bella, 33% Sky
 
 ---
 
@@ -300,12 +258,13 @@ A complete n8n workflow pattern:
 
 | Issue | Solution |
 |-------|----------|
-| **Remotion build fails** | First build takes 2-5 min (npm install + Chromium bundle). Check logs: `docker compose logs remotion` |
+| **Remotion build fails** | First build takes 2-5 min (npm install + Chromium). Check logs: `docker compose logs remotion` |
 | **n8n can't reach services** | Use Docker service names: `http://remotion:3000`, `http://kokoro-tts:8880` |
-| **File Upload Admin not working** | Hard refresh: **Ctrl+Shift+R** |
+| **Node shows "no credentials"** | Create credential: Server URL = `http://remotion:3000` |
+| **Text stays in center** | Set Vertical Position → **Bottom** + rebuild remotion: `docker compose up -d --build remotion` |
+| **Broken icon in n8n** | Update node to v0.1.1+: `npm i n8n-nodes-remotion-render@latest` |
+| **TikTok captions not highlighting** | Set Caption Style → TikTok Style + Word Timing → 400ms |
 | **Port already in use** | Change host ports in `docker-compose.yml` |
-| **File upload healthcheck fails** | Healthcheck uses Python `urllib`. Ensure `python3` is available in the container |
-| **Upload node error: "Field required" for file** | Set Form-Data field `file` → Mode: "From Binary Property" → Property: `data` |
 
 ## 🔒 Security Notes
 
@@ -317,25 +276,19 @@ A complete n8n workflow pattern:
 
 ## 💾 Backups
 
-Docker volumes are backed up automatically via cron:
+Docker volumes backed up daily at 2:00 AM UTC:
 
 ```bash
-# Run at 2:00 AM UTC daily
-0 2 * * * /home/ubuntu/backup-volumes.sh >> /home/ubuntu/backups/backup.log 2>&1
+0 2 * * * /home/ubuntu/backup-volumes.sh >> logs/backup.log 2>&1
 ```
 
-**Backed up volumes:** n8n_storage, postgres_storage, qdrant_storage, file_uploads, remotion_output  
-**Retention:** Last 7 daily backups kept  
-**Location:** `/home/ubuntu/backups/`
+**Backed up:** n8n_storage, postgres_storage, qdrant_storage, file_uploads, remotion_output
 
-### Restore from backup
+### Restore
 
 ```bash
-# List available backups
 ls /home/ubuntu/backups/*.tar.gz
-
-# Restore a specific volume
-/home/ubuntu/restore-volume.sh n8n-qdrant-starter_n8n_storage /home/ubuntu/backups/n8n-qdrant-starter_n8n_storage-2026-07-02.tar.gz
+/home/ubuntu/restore-volume.sh volume-name backup.tar.gz
 ```
 
 ## ☁️ Deployment
@@ -363,7 +316,7 @@ docker compose up -d --build
 | `5678` | n8n web UI |
 | `8010` | File Upload API + admin |
 | `6333` | Qdrant (internal only recommended) |
-| `3000` | Remotion video rendering API |
+| `3000` | Remotion video rendering API + builder UI |
 | `8880` | Kokoro TTS API |
 
 ## 📁 Project Structure
@@ -371,21 +324,25 @@ docker compose up -d --build
 ```
 n8n-qdrant-starter/
 ├── .env.example              # Environment template
-├── docker-compose.yml        # All services (n8n, Qdrant, file-upload, Remotion, Kokoro)
+├── docker-compose.yml        # All services in one stack
 ├── README.md
-├── LICENSE                   # MIT
+├── LICENSE
 ├── scripts/
 │   └── n8n-entrypoint.sh
-├── remotion/                 # Remotion video render engine (replaces CutEngine)
+├── remotion/                 # Remotion video render engine
 │   ├── Dockerfile
 │   ├── src/
-│   │   ├── server.ts
-│   │   ├── Root.tsx
+│   │   ├── server.ts         # Express API + render route
+│   │   ├── Root.tsx          # Remotion entry point
 │   │   └── compositions/
-│   │       └── VideoComposition.tsx
+│   │       └── VideoComposition.tsx  # All rendering logic
 │   └── package.json
-├── file-upload-server/       # File Upload API source
-│   ├── Dockerfile
-│   └── ...
+├── n8n-nodes-remotion-render/        # n8n community node
+│   ├── nodes/RemotionRender/         # Node source + UI fields
+│   └── credentials/                  # Credential type
+├── file-upload-server/      # File Upload API
+├── tools/
+│   ├── remotion-render-workflow.json # Sample n8n workflow
+│   └── REMOTION-ROADMAP.md          # Feature roadmap
 └── ...
 ```

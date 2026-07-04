@@ -294,6 +294,42 @@ export class RemotionRender implements INodeType {
 								placeholder: 'rgba(0,0,0,0.3)',
 								description: 'Background behind the text (CSS color). Empty = transparent',
 							},
+							{
+								displayName: 'Animation',
+								name: 'textAnimation',
+								type: 'options',
+								options: [
+									{ name: 'None', value: 'none' },
+									{ name: 'Fade In', value: 'fadeIn' },
+									{ name: 'Slide Up', value: 'slideUp' },
+									{ name: 'Scale In', value: 'scale' },
+									{ name: 'Typewriter', value: 'typewriter' },
+								],
+								default: 'none',
+								description: 'Text entrance animation',
+							},
+							{
+								displayName: 'Caption Style',
+								name: 'captionStyle',
+								type: 'options',
+								options: [
+									{ name: 'Static', value: 'static', description: 'Normal text overlay' },
+									{ name: 'TikTok Style', value: 'tiktok', description: 'Word-by-word highlighting' },
+								],
+								default: 'static',
+								description: 'How captions are rendered. TikTok style highlights each word as it is spoken',
+							},
+							{
+								displayName: 'Word Timing (ms)',
+								name: 'combineMs',
+								type: 'number',
+								default: 400,
+								displayOptions: {
+									show: { captionStyle: ['tiktok'] },
+								},
+								typeOptions: { minValue: 100, maxValue: 3000 },
+								description: 'Milliseconds per word. Lower = faster word-by-word. Higher = more words per page (400 = classic TikTok style, 1200 = sentence-by-sentence)',
+							},
 						],
 					},
 				],
@@ -417,6 +453,7 @@ export class RemotionRender implements INodeType {
 									{ name: 'SD (1024×576)', value: 'sd' },
 									{ name: 'HD (1280×720)', value: 'hd' },
 									{ name: 'Full HD (1920×1080)', value: '1080' },
+									{ name: 'Vertical / Reels (1080×1920)', value: 'vertical' },
 									{ name: '4K (3840×2160)', value: '4k' },
 								],
 								default: '1080',
@@ -571,8 +608,8 @@ export class RemotionRender implements INodeType {
 
 				if (texts.length) {
 					tracks.push({
-						clips: texts.map((txt) => ({
-							asset: {
+						clips: texts.map((txt) => {
+							const asset: IDataObject = {
 								type: 'text',
 								text: txt.text || '',
 								font: {
@@ -586,10 +623,28 @@ export class RemotionRender implements INodeType {
 									vertical: (txt.vertical as string) || 'bottom',
 								},
 								background: (txt.background as string) || 'rgba(0,0,0,0.3)',
-							},
-							start: Number(txt.start) || 0,
-							length: Number(txt.length) || totalDuration,
-						})),
+							};
+							// TikTok captions style
+							const capStyle = txt.captionStyle as string;
+							if (capStyle && capStyle !== 'static') {
+								asset.captionStyle = capStyle;
+							}
+							const combineMs = txt.combineMs as number;
+							if (combineMs) {
+								asset.combineMs = Number(combineMs);
+							}
+							const clip: IDataObject = {
+								asset,
+								start: Number(txt.start) || 0,
+								length: Number(txt.length) || totalDuration,
+							};
+							// Text animation
+							const anim = txt.textAnimation as string;
+							if (anim && anim !== 'none') {
+								clip.textAnimation = anim;
+							}
+							return clip;
+						}),
 					});
 				}
 
