@@ -10,11 +10,14 @@ An n8n community node for rendering videos using a self-hosted [Remotion](https:
 ## 🚀 Features
 
 - **📷 Multiple images** with Ken Burns effects (zoom, slide, pan)
-- **📝 Text overlays** — position at bottom (captions), center, or top
+- **📝 Text overlays** — captions (bottom), titles (center/up), TikTok word-by-word style
 - **🎵 Multi-track audio** — scene-specific audio clips + background soundtrack
-- **🔄 Dynamic input** — drag-and-drop fields OR pipe JSON from upstream nodes
+- **🔄 3 input methods**:
+  - **Manual** — drag-and-drop fields in the node UI
+  - **From Input JSON** — pipe structured JSON from upstream nodes
+  - **Auto Collect** — **★ NEW** detects images/audios/texts automatically from any upstream node, no config needed
 - **⏳ Auto-poll** — node blocks until video is ready, returns download URL
-- **🎬 Resolutions** — preview, mobile, SD, HD (1080p), 4K
+- **🎬 Resolutions** — preview, mobile, SD, HD (1080p), vertical/Reels, 4K
 - **🌐 Any Remotion server** — local Docker, remote VPS, or cloud
 
 ---
@@ -62,7 +65,7 @@ After installing the node, create a credential:
 
 ## 🎬 Usage
 
-### Manual mode (drag-and-drop)
+### Input Method: Manual (drag-and-drop)
 
 > **Node colors**: 🟣 **Remotion Render - mimnets** in the n8n editor
 
@@ -76,9 +79,13 @@ After installing the node, create a credential:
 8. Connect a trigger node before it (Manual, Webhook, Schedule, etc.)
 9. Run the workflow
 
-### Input JSON mode (dynamic data)
+**Best for:** Testing, fixed content, predictable timelines.
 
-Use this when you want to pass data from an upstream Code node, AI node, or HTTP request:
+---
+
+### Input Method: From Input JSON (structured data)
+
+Use this when you want to pass data from an upstream Code node, LLM node, or HTTP request:
 
 1. **Input Method → From Input JSON**
 2. Connect the output of any node that returns this structure:
@@ -118,7 +125,94 @@ const texts = [
 return { images, texts, resolution: "1080", fps: 25 };
 ```
 
+**Best for:** Power users, custom logic, AI-generated content, structured data pipelines.
+
+---
+
+### Input Method: Auto Collect (★ NEW — recommended for most workflows)
+
+This is the easiest way to use the node. **No Code node needed.** Connect *any* upstream node that outputs image URLs, audio files, or text content — the node detects everything automatically.
+
+1. Select **Input Method → Auto Collect**
+2. Connect upstream nodes (image generators, file uploaders, AI text nodes, etc.)
+3. (Optional) Adjust defaults under **Auto Collect Defaults**
+4. Run
+
+#### How detection works
+
+The node scans every item from the previous node and classifies it:
+
+| Detection method | What's detected |
+|---|---|
+| **Explicit `type` field** | Set `type: "image"`, `type: "audio"`, `type: "text"`, or `type: "soundtrack"` |
+| **File extension** | `.jpg` / `.png` / `.webp` / `.gif` → image |
+| | `.mp3` / `.wav` / `.ogg` / `.m4a` → audio |
+| **Key name patterns** | `url` / `src` + image-like keys (`image`, `photo`, `thumbnail`) → image |
+| | `soundtrack` / `bgm` / `background_music` / `music` keys → soundtrack |
+| | `text` / `caption` / `title` / `headline` keys → text overlay |
+| **content_type / mime** | `image/png`, `audio/mpeg`, etc. |
+
+#### What gets auto-timelined
+
+- **Images** — placed sequentially, each gets the default duration (configurable, 4s default)
+- **Audio clips** — aligned with images by index, or all start at frame 0
+- **Text overlays** — placed alongside corresponding images
+- **Soundtrack** — plays throughout the entire video
+
+#### Example workflows
+
+**5 images from an image generator:**
+
+```
+[Image Generation Node] → outputs 5 items, each { url: "https://.../img.png" }
+        ↓
+[Remotion Render - Auto Collect]
+   → Detects 5 images
+   → Auto-timelines: each gets 4s = 20s video
+   → Renders and returns download URL
+```
+
+**Images + voice-overs from separate nodes:**
+
+```
+[Image Gen]  ──→ { url: "img1.png" }, { url: "img2.png" }
+                    ↓
+[Voice Gen]  ──→ { url: "voice1.mp3" }, { url: "voice2.mp3" }
+                    ↓
+[Merge Node (combine)]
+                    ↓
+[Remotion Render - Auto Collect]
+   → Detects: 2 images + 2 audio
+   → Aligns by index: img1+voice1 play together, img2+voice2 next
+   → Renders video with audio synced to visuals
+```
+
+**Mixed items (no extra nodes needed):**
+
+If your upstream outputs items with both `url: "img.jpg"` and `caption: "hello"`, the node extracts both and places them on the timeline together.
+
+#### Auto Collect defaults you can configure
+
+| Setting | Default | Description |
+|---|---|---|
+| Image Duration | 4s | Seconds each image stays on screen |
+| Image Effect | fade | Ken Burns effect: fade, zoomIn, slideLeft, etc. |
+| Image Fit | contain | Contain = show full image, Cover = fill & crop |
+| Audio Align Mode | by index | Index = align with images, All at start = simultaneous |
+| Text Position | bottom | Bottom, center, or top |
+| Text Font Size | 40 | Default caption size |
+| Text Font Color | #FFFFFF | White |
+| Soundtrack Volume | 0.15 | Quiet background (0–1) |
+| Resolution | 1080 | Full HD (1920×1080) |
+| FPS | 25 | Frames per second |
+
+**Best for:** Beginners, variable-content workflows, quick prototypes, AI pipelines where the number of items changes each run.
+
+---
+
 ### Output
+
+The node returns:
 
 ```json
 {
@@ -134,22 +228,42 @@ Pass `downloadUrl` into an HTTP Request node (GET, Response Format: File) to dow
 
 ---
 
-## 🧩 Full Workflow Example
+## 🧩 Full Workflow Examples
+
+### Example 1: AI images → video reel
+
+```
+[OpenClaw Image Generator]  → 5 social media images
+        ↓
+[Remotion Render - Auto Collect]  → detects images, builds reel
+        ↓
+[HTTP Request]  → download MP4
+        ↓
+[Telegram / Discord]  → publish
+```
+
+### Example 2: Structured data (Code node)
 
 ```
 [Manual Trigger]
-       │
-       ▼
+        ↓
 [Code Node]  ← Build images[], texts[], audios[]
-       │
-       ▼
-[Remotion Render - mimnets]  ← Input Method: From Input JSON
-       │
-       ▼
-[HTTP Request]  ← GET the videoUrl → download file
-       │
-       ▼
-[Google Drive / Telegram / Email]  ← publish
+        ↓
+[Remotion Render - From Input JSON]
+        ↓
+[HTTP Request]  → download file
+```
+
+### Example 3: Voice-over slideshow
+
+```
+[Image Upload Node]  → { url: "...", caption: "Slide 1" }
+                     → { url: "...", caption: "Slide 2" }
+        ↓
+[Remotion Render - Auto Collect]
+   → Detects: 2 images + 2 captions
+   → Timeline: img1 + "Slide 1" → img2 + "Slide 2"
+   → Renders video
 ```
 
 ---
@@ -197,11 +311,11 @@ Pass `downloadUrl` into an HTTP Request node (GET, Response Format: File) to dow
 | Audio URL | string | Background music URL |
 | Volume | number | 0–1 (0.15 = quiet background, 1 = full volume) |
 
-### Output fields
+### Output settings (Manual mode)
 
 | Field | Type | Description |
 |---|---|---|
-| Resolution | select | `preview` (512×288), `mobile` (640×360), `sd` (1024×576), `hd` (1280×720), **`1080`** (1920×1080), `4k` (3840×2160) |
+| Resolution | select | `preview` (512×288), `mobile` (640×360), `sd` (1024×576), `hd` (1280×720), **`1080`** (1920×1080), `vertical` (1080×1920), `4k` (3840×2160) |
 | FPS | number | 1–60 (25 recommended) |
 
 ---
@@ -240,6 +354,7 @@ Your Remotion server at `http://remotion:3000` supports these endpoints:
 | `sd` | 1024×576 | Standard definition |
 | `hd` | 1280×720 | YouTube, social platforms |
 | `1080` (default) | 1920×1080 | Full HD — best quality |
+| `vertical` | 1080×1920 | TikTok/Reels/Shorts |
 | `4k` | 3840×2160 | Ultra HD — longer render times |
 
 ### Rebuilding the Remotion container
@@ -255,6 +370,15 @@ docker compose up -d remotion
 ---
 
 ## 🚨 Troubleshooting
+
+### Auto Collect detects nothing
+
+The upstream data doesn't have recognizable fields. Common fixes:
+
+1. **Use explicit `type` field** — add `"type": "image"` or `"type": "audio"` to each item
+2. **Check your field names** — the node looks for `url`, `src`, `image`, `photo`, `caption`, `text`, `soundtrack`
+3. **Check file extensions** — `.png`, `.jpg`, `.mp3` are the most reliable signals
+4. **Still not working?** — Switch to **From Input JSON** mode and use a Code node to format the data
 
 ### Text stays in center (not at bottom)
 
@@ -280,7 +404,7 @@ You need to create a credential first:
 
 ### Node icon shows broken image
 
-Update to the latest version: `n8n-nodes-remotion-render@0.1.1+` includes an SVG icon.
+Update to the latest version: `n8n-nodes-remotion-render@0.3.0+` includes an SVG icon.
 
 ---
 

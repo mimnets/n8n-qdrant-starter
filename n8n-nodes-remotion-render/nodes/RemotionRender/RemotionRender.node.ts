@@ -8,6 +8,202 @@ import {
 } from 'n8n-workflow';
 import { remotionApiRequest, pollRender } from './GenericFunctions';
 
+// -------------------------------------------------------------------
+// Types
+// -------------------------------------------------------------------
+interface DetectedAsset {
+	type: 'image' | 'audio' | 'text' | 'soundtrack';
+	src?: string;
+	text?: string;
+	meta: IDataObject;
+}
+
+// -------------------------------------------------------------------
+// Detection helpers
+// -------------------------------------------------------------------
+
+/** Known keys that strongly suggest an item IS an image */
+const IMAGE_KEYS = new Set([
+	'image', 'image_url', 'imageUrl', 'img', 'photo', 'photo_url', 'photoUrl',
+	'thumbnail', 'thumbnail_url', 'thumbnailUrl',
+]);
+
+/** Known keys that strongly suggest an item IS an audio clip */
+const AUDIO_KEYS = new Set([
+	'audio', 'audio_url', 'audioUrl', 'voice', 'voice_url', 'voiceUrl',
+	'voiceover', 'voice_over', 'voiceOver', 'clip',
+]);
+
+/** Known keys that strongly suggest background music */
+const SOUNDTRACK_KEYS = new Set([
+	'soundtrack', 'bgm', 'background_music', 'backgroundMusic',
+	'music', 'music_url', 'musicUrl',
+]);
+
+/** Known keys that strongly suggest a text overlay */
+const TEXT_KEYS = new Set([
+	'text', 'caption', 'title', 'headline', 'subtitle', 'overlay',
+	'label', 'description',
+]);
+
+/** File extensions that indicate image */
+const IMAGE_EXTENSIONS = new Set([
+	'.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.bmp', '.svg',
+]);
+
+/** File extensions that indicate audio */
+const AUDIO_EXTENSIONS = new Set([
+	'.mp3', '.wav', '.ogg', '.aac', '.m4a', '.flac', '.wma', '.opus',
+]);
+
+function getExtensionLower(url: string): string {
+	try {
+		const pathname = new URL(url).pathname;
+		const dot = pathname.lastIndexOf('.');
+		return dot >= 0 ? pathname.slice(dot).toLowerCase() : '';
+	} catch {
+		const dot = url.lastIndexOf('.');
+		return dot >= 0 ? url.slice(dot).toLowerCase() : '';
+	}
+}
+
+function hasKey(item: IDataObject, keys: Set<string>): string | null {
+	for (const k of Object.keys(item)) {
+		if (keys.has(k)) return k;
+	}
+	return null;
+}
+
+function isDefined(val: unknown): boolean {
+	return val !== undefined && val !== null && val !== '';
+}
+
+/**
+ * Classify a single upstream item into one or more asset types.
+ * Returns an array because a single item could contain both an image url
+ * and a text caption (e.g. a social media post).
+ */
+function classifyItem(item: IDataObject): DetectedAsset[] {
+	const results: DetectedAsset[] = [];
+
+	// If the item has a `type` field that tells us directly
+	const explicitType = item.type as string | undefined;
+	if (explicitType) {
+		const t = explicitType.toLowerCase();
+		if (t === 'image' || t === 'photo') {
+			const src = (item.url || item.src || item.image_url || item.imageUrl) as string;
+			if (isDefined(src)) {
+				results.push({ type: 'image', src: String(src), meta: { ...item } });
+				return results; // explicit type → don't also classify as other things
+			}
+		}
+		if (t === 'audio' || t === 'voice' || t === 'voiceover') {
+			const src = (item.url || item.src || item.audio_url || item.audioUrl) as string;
+			if (isDefined(src)) {
+				results.push({ type: 'audio', src: String(src), meta: { ...item } });
+				return results;
+			}
+		}
+		if (t === 'soundtrack' || t === 'bgm' || t === 'music') {
+			const src = (item.url || item.src) as string;
+			if (isDefined(src)) {
+				results.push({ type: 'soundtrack', src: String(src), meta: { ...item } });
+				return results;
+			}
+		}
+		if (t === 'text' || t === 'caption' || t === 'subtitle') {
+			const txt = (item.text || item.caption || item.content) as string;
+			if (isDefined(txt)) {
+				results.push({ type: 'text', text: String(txt), meta: { ...item } });
+				return results;
+			}
+		}
+		// Unknown type — fall through to auto-detection
+	}
+
+	// Check if item is a soundtrack candidate (special keys)
+	const soundtrackKey = hasKey(item, SOUNDTRACK_KEYS);
+	if (soundtrackKey) {
+		const val = item[soundtrackKey];
+		if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+			results.push({ type: 'soundtrack', src: String((val as IDataObject).src || (val as IDataObject).url || ''), meta: val as IDataObject });
+			return results;
+		}
+		if (typeof val === 'string') {
+			results.push({ type: 'soundtrack', src: val, meta: { src: val } });
+			return results;
+		}
+	}
+
+	// Collect url/src candidates
+	const urlCandidates: string[] = [];
+	const url = item.url as string;
+	const src = item.src as string;
+	if (isDefined(url)) urlCandidates.push(String(url));
+	if (isDefined(src) && src !== url) urlCandidates.push(String(src));
+
+	// Also check known key aliases
+	const imageKey = hasKey(item, IMAGE_KEYS);
+	if (imageKey) {
+		const val = item[imageKey];
+		if (typeof val === 'string') urlCandidates.push(val);
+	}
+	const audioKey = hasKey(item, AUDIO_KEYS);
+	if (audioKey && !audioKey.startsWith('image')) {
+		const val = item[audioKey];
+		if (typeof val === 'string' && !urlCandidates.includes(val)) urlCandidates.push(val);
+	}
+
+	// Classify each url by extension
+	for (const candidateUrl of urlCandidates) {
+		const ext = getExtensionLower(candidateUrl);
+		if (IMAGE_EXTENSIONS.has(ext)) {
+			// Already has this url as image? skip duplicate
+			if (!results.some(r => r.type === 'image' && r.src === candidateUrl)) {
+				results.push({ type: 'image', src: candidateUrl, meta: { ...item } });
+			}
+		} else if (AUDIO_EXTENSIONS.has(ext)) {
+			if (!results.some(r => r.type === 'audio' && r.src === candidateUrl)) {
+				results.push({ type: 'audio', src: candidateUrl, meta: { ...item } });
+			}
+		} else {
+			// Unknown extension — guess by key name
+			if (imageKey && results.length === 0) {
+				results.push({ type: 'image', src: candidateUrl, meta: { ...item } });
+			} else if (audioKey && !results.some(r => r.type === 'audio')) {
+				results.push({ type: 'audio', src: candidateUrl, meta: { ...item } });
+			}
+		}
+	}
+
+	// Check for text content
+	const textKey = hasKey(item, TEXT_KEYS);
+	if (textKey) {
+		const txt = item[textKey] as string;
+		if (isDefined(txt)) {
+			results.push({ type: 'text', text: String(txt), meta: { ...item } });
+		}
+	}
+
+	// Check for content_type / mime hints
+	const contentType = (item.content_type || item.mime_type || item.mime) as string | undefined;
+	if (contentType && results.length === 0) {
+		const ct = contentType.toLowerCase();
+		if (ct.startsWith('image/')) {
+			const candidate = (url || item.src || '') as string;
+			if (isDefined(candidate)) results.push({ type: 'image', src: String(candidate), meta: { ...item } });
+		} else if (ct.startsWith('audio/')) {
+			const candidate = (url || item.src || '') as string;
+			if (isDefined(candidate)) results.push({ type: 'audio', src: String(candidate), meta: { ...item } });
+		}
+	}
+
+	return results;
+}
+
+// -------------------------------------------------------------------
+// Node
+// -------------------------------------------------------------------
 export class RemotionRender implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Remotion Render - mimnets',
@@ -68,7 +264,7 @@ export class RemotionRender implements INodeType {
 			},
 
 			// ================================================================
-			// INPUT SOURCE — "Manual" or "From Input JSON"
+			// INPUT SOURCE — "Manual", "From Input JSON", or "Auto Collect"
 			// ================================================================
 			{
 				displayName: 'Input Method',
@@ -86,6 +282,12 @@ export class RemotionRender implements INodeType {
 						value: 'inputJson',
 						description:
 							'Read images[], texts[], audios[] from the previous node\'s output JSON',
+					},
+					{
+						name: 'Auto Collect — detect all upstream items',
+						value: 'autoCollect',
+						description:
+							'Collect all incoming items, detect images/audios/texts automatically, and build the timeline',
 					},
 				],
 				default: 'manual',
@@ -107,8 +309,161 @@ export class RemotionRender implements INodeType {
 				default: '',
 			},
 
+			// ---- Auto Collect note ----
+			{
+				displayName:
+					'All items from the previous node are collected automatically. The node detects each item by:\n\n' +
+					'• <strong>Explicit "type" field</strong>: set type to "image", "audio", "text", or "soundtrack"\n' +
+					'• <strong>File extension</strong>: .jpg/.png/.webp → image, .mp3/.wav/.ogg → audio\n' +
+					'• <strong>Key names</strong>: url/src + image key → image, soundtrack/bgm key → soundtrack\n' +
+					'• <strong>text/caption</strong> key → text overlay\n' +
+					'• <strong>content_type/mime</strong> field\n\n' +
+					'<strong>Auto-timeline:</strong> Each image gets a default duration. Voice-over audios align with images by index. Adjust defaults below.',
+				name: 'autoCollectNote',
+				type: 'notice',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['autoCollect'] },
+				},
+				default: '',
+			},
+
+			// ---- Auto Collect defaults ----
+			{
+				displayName: 'Auto Collect Defaults',
+				name: 'autoCollectDefaults',
+				placeholder: 'Defaults',
+				type: 'fixedCollection',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['autoCollect'] },
+				},
+				default: {},
+				options: [
+					{
+						name: 'defaults',
+						displayName: 'Defaults',
+						values: [
+							{
+								displayName: 'Image Duration (seconds)',
+								name: 'imageDuration',
+								type: 'number',
+								default: 4,
+								typeOptions: { minValue: 1, maxValue: 60 },
+								description: 'How long each auto-detected image stays on screen',
+							},
+							{
+								displayName: 'Image Effect',
+								name: 'imageEffect',
+								type: 'options',
+								options: [
+									{ name: 'None', value: '' },
+									{ name: 'Fade', value: 'fade', description: 'Fade in / fade out' },
+									{ name: 'Zoom In', value: 'zoomIn' },
+									{ name: 'Zoom Out', value: 'zoomOut' },
+									{ name: 'Slide Left', value: 'slideLeft' },
+									{ name: 'Slide Right', value: 'slideRight' },
+									{ name: 'Slide Up', value: 'slideUp' },
+									{ name: 'Slide Down', value: 'slideDown' },
+								],
+								default: 'fade',
+								description: 'Default animation effect for auto-detected images',
+							},
+							{
+								displayName: 'Image Fit',
+								name: 'imageFit',
+								type: 'options',
+								options: [
+									{ name: 'Contain (fit inside)', value: 'contain' },
+									{ name: 'Cover (fill & crop)', value: 'cover' },
+									{ name: 'Fill (stretch)', value: 'fill' },
+								],
+								default: 'contain',
+								description: 'How images fit the frame',
+							},
+							{
+								displayName: 'Audio Align Mode',
+								name: 'audioAlign',
+								type: 'options',
+								options: [
+									{
+										name: 'By Index — align with images',
+										value: 'index',
+										description: 'First audio plays with first image, second with second, etc.',
+									},
+									{
+										name: 'All at Start — play simultaneously',
+										value: 'allStart',
+										description: 'All audio clips start at frame 0 (for simultaneous playback)',
+									},
+								],
+								default: 'index',
+								description: 'How auto-detected audio clips are positioned in the timeline',
+							},
+							{
+								displayName: 'Text Vertical',
+								name: 'textVertical',
+								type: 'options',
+								options: [
+									{ name: 'Top', value: 'top' },
+									{ name: 'Center', value: 'center' },
+									{ name: 'Bottom', value: 'bottom' },
+								],
+								default: 'bottom',
+								description: 'Default vertical position for auto-detected text overlays',
+							},
+							{
+								displayName: 'Text Font Size',
+								name: 'textFontSize',
+								type: 'number',
+								default: 40,
+								typeOptions: { minValue: 12, maxValue: 200 },
+								description: 'Default font size for auto-detected text overlays',
+							},
+							{
+								displayName: 'Text Font Color',
+								name: 'textFontColor',
+								type: 'color',
+								default: '#FFFFFF',
+								description: 'Default text color',
+							},
+							{
+								displayName: 'Soundtrack Volume',
+								name: 'soundtrackVolume',
+								type: 'number',
+								default: 0.15,
+								typeOptions: { minValue: 0, maxValue: 1, numberPrecision: 2 },
+								description: 'Default volume for auto-detected soundtrack',
+							},
+							{
+								displayName: 'Resolution',
+								name: 'resolution',
+								type: 'options',
+								options: [
+									{ name: 'Preview (512×288)', value: 'preview' },
+									{ name: 'Mobile (640×360)', value: 'mobile' },
+									{ name: 'SD (1024×576)', value: 'sd' },
+									{ name: 'HD (1280×720)', value: 'hd' },
+									{ name: 'Full HD (1920×1080)', value: '1080' },
+									{ name: 'Vertical / Reels (1080×1920)', value: 'vertical' },
+									{ name: '4K (3840×2160)', value: '4k' },
+								],
+								default: '1080',
+								description: 'Video resolution preset',
+							},
+							{
+								displayName: 'FPS',
+								name: 'fps',
+								type: 'number',
+								default: 25,
+								typeOptions: { minValue: 1, maxValue: 60 },
+								description: 'Frames per second',
+							},
+						],
+					},
+				],
+			},
+
 			// ================================================================
-			// IMAGES — fixedCollection, multipleValues
+			// IMAGES — fixedCollection, multipleValues (Manual mode only)
 			// ================================================================
 			{
 				displayName: 'Images',
@@ -133,7 +488,7 @@ export class RemotionRender implements INodeType {
 								type: 'string',
 								default: '',
 								placeholder: 'https://example.com/image.jpg',
-				required: true,
+								required: true,
 								description: 'URL of the image to display',
 							},
 							{
@@ -189,7 +544,7 @@ export class RemotionRender implements INodeType {
 			},
 
 			// ================================================================
-			// TEXTS — fixedCollection, multipleValues
+			// TEXTS — fixedCollection, multipleValues (Manual mode only)
 			// ================================================================
 			{
 				displayName: 'Text Overlays',
@@ -337,7 +692,7 @@ export class RemotionRender implements INodeType {
 			},
 
 			// ================================================================
-			// AUDIO CLIPS — fixedCollection, multipleValues
+			// AUDIO CLIPS — fixedCollection, multipleValues (Manual mode only)
 			// ================================================================
 			{
 				displayName: 'Audio Clips',
@@ -386,7 +741,7 @@ export class RemotionRender implements INodeType {
 			},
 
 			// ================================================================
-			// SOUNDTRACK
+			// SOUNDTRACK (Manual mode only)
 			// ================================================================
 			{
 				displayName: 'Soundtrack',
@@ -428,7 +783,7 @@ export class RemotionRender implements INodeType {
 			},
 
 			// ================================================================
-			// OUTPUT SETTINGS
+			// OUTPUT SETTINGS (Manual mode only)
 			// ================================================================
 			{
 				displayName: 'Output Settings',
@@ -511,13 +866,282 @@ export class RemotionRender implements INodeType {
 		}
 
 		// ---- RENDER VIDEO ----
+		// We process items in bulk for autoCollect (single render from all items)
+		// or per-item for manual/inputJson
+		const inputSource = this.getNodeParameter('inputSource', 0, 'manual') as string;
+
+		if (inputSource === 'autoCollect') {
+			// ----------------------------------------------------------------
+			// AUTO COLLECT MODE — single render from all upstream items
+			// ----------------------------------------------------------------
+			try {
+				const defaultsParam = this.getNodeParameter('autoCollectDefaults', 0, {}) as IDataObject;
+				const defaultsArr = (defaultsParam.defaults as IDataObject[]) || [];
+				const d = defaultsArr.length > 0 ? defaultsArr[0] : {};
+
+				const imageDuration = Number(d.imageDuration) || 4; // seconds
+				const imageEffect = (d.imageEffect as string) || 'fade';
+				const imageFit = (d.imageFit as string) || 'contain';
+				const audioAlign = (d.audioAlign as string) || 'index';
+				const textVertical = (d.textVertical as string) || 'bottom';
+				const textFontSize = Number(d.textFontSize) || 40;
+				const textFontColor = (d.textFontColor as string) || '#FFFFFF';
+				const soundtrackVolume = Number(d.soundtrackVolume) || 0.15;
+				const resolution = (d.resolution as string) || '1080';
+				const fps = Number(d.fps) || 25;
+
+				// Check if upstream already had a structured payload (detect top-level arrays)
+				const firstItem = items[0]?.json as IDataObject;
+				const hasStructuredPayload =
+					Array.isArray(firstItem?.images) ||
+					Array.isArray(firstItem?.texts) ||
+					Array.isArray(firstItem?.audios) ||
+					typeof firstItem?.soundtrack === 'object';
+
+				let images: IDataObject[] = [];
+				let texts: IDataObject[] = [];
+				let audios: IDataObject[] = [];
+				let soundtrack: IDataObject | null = null;
+
+				if (hasStructuredPayload) {
+					// Fallback to inputJson behavior (upstream sent structured array)
+					if (Array.isArray(firstItem.images)) images = firstItem.images as IDataObject[];
+					if (Array.isArray(firstItem.texts)) texts = firstItem.texts as IDataObject[];
+					if (Array.isArray(firstItem.audios)) audios = firstItem.audios as IDataObject[];
+					if (typeof firstItem.soundtrack === 'object' && firstItem.soundtrack !== null) {
+						soundtrack = firstItem.soundtrack as IDataObject;
+					}
+				} else {
+					// AUTO-DETECT: classify every item, build timeline
+					const detectedImages: DetectedAsset[] = [];
+					const detectedAudios: DetectedAsset[] = [];
+					const detectedTexts: DetectedAsset[] = [];
+					let detectedSoundtrack: DetectedAsset | null = null;
+
+					for (const item of items) {
+						const assets = classifyItem(item.json as IDataObject);
+						for (const asset of assets) {
+							if (asset.type === 'image') detectedImages.push(asset);
+							else if (asset.type === 'soundtrack') detectedSoundtrack = asset;
+							else if (asset.type === 'audio') detectedAudios.push(asset);
+							else if (asset.type === 'text') detectedTexts.push(asset);
+						}
+					}
+
+					if (detectedImages.length === 0 && detectedAudios.length === 0 && detectedTexts.length === 0 && !detectedSoundtrack) {
+						// Nothing detected — show a helpful error
+						const sampleKeys = items.length > 0
+							? Object.keys(items[0].json).slice(0, 6).join(', ')
+							: '(no items)';
+						throw new NodeOperationError(
+							this.getNode(),
+							`Auto Collect couldn't detect any images, audios, or text in the incoming data. ` +
+							`First item keys: ${sampleKeys}. ` +
+							`Either use "Manual" or "From Input JSON" mode, or ensure upstream data has ` +
+							`recognizable keys (url, src, text, caption) or file extensions (.jpg, .png, .mp3).`,
+						);
+					}
+
+					// Convert detection results to timeline items
+					// Images: sequential with auto-timing
+					const frameDuration = imageDuration * fps;
+					images = detectedImages.map((img, i) => ({
+						src: img.src,
+						start: i * frameDuration / fps, // in seconds
+						length: imageDuration,
+						effect: imageEffect || undefined,
+						fit: imageFit,
+						// Pass through metadata from upstream
+						...(img.meta.transition ? { transition: img.meta.transition } : {}),
+						...(img.meta.fadeIn ? { fadeIn: true } : {}),
+						...(img.meta.fadeOut ? { fadeOut: true } : {}),
+					}));
+
+					// Audios: by index (align with images) or all at start
+					if (audioAlign === 'allStart') {
+						audios = detectedAudios.map((a) => ({
+							src: a.src,
+							start: 0,
+							length: imageDuration * Math.max(images.length, 1),
+						}));
+					} else {
+						audios = detectedAudios.map((a, i) => ({
+							src: a.src,
+							start: (i * frameDuration) / fps,
+							length: imageDuration,
+						}));
+					}
+
+					// Soundtrack
+					if (detectedSoundtrack) {
+						soundtrack = {
+							src: detectedSoundtrack.src,
+							volume: soundtrackVolume,
+						};
+					}
+
+					// Texts: align with images by index
+					texts = detectedTexts.map((t, i) => ({
+						text: t.text,
+						start: (i * frameDuration) / fps,
+						length: imageDuration,
+						vertical: textVertical,
+						horizontal: 'center',
+						fontSize: textFontSize,
+						fontColor: textFontColor,
+						fontFamily: 'Inter',
+					}));
+				}
+
+				// ----- Build the payload (same as before) -----
+				const allClips = [...images, ...texts, ...audios];
+				const totalDuration = allClips.reduce((max, c) => {
+					const start = Number(c.start) || 0;
+					const length = Number(c.length) || 5;
+					return Math.max(max, start + length);
+				}, 0) || 5;
+
+				const tracks: IDataObject[] = [];
+
+				if (images.length) {
+					tracks.push({
+						clips: images.map((img) => {
+							const clip: IDataObject = {
+								asset: { type: 'image', src: img.src },
+								start: Number(img.start) || 0,
+								length: Number(img.length) || totalDuration,
+								fit: (img.fit as string) || 'cover',
+							};
+							const effect = img.effect as string;
+							if (effect) clip.effect = effect;
+							const fadeIn = !!(img.fadeIn || (img.transition as IDataObject)?.in === 'fade');
+							const fadeOut = !!(img.fadeOut || (img.transition as IDataObject)?.out === 'fade');
+							if (fadeIn || fadeOut) {
+								clip.transition = {};
+								if (fadeIn) (clip.transition as IDataObject).in = 'fade';
+								if (fadeOut) (clip.transition as IDataObject).out = 'fade';
+							}
+							return clip;
+						}),
+					});
+				}
+
+				if (texts.length) {
+					tracks.push({
+						clips: texts.map((txt) => {
+							const asset: IDataObject = {
+								type: 'text',
+								text: txt.text || '',
+								font: {
+									family: (txt.fontFamily as string) || 'Inter',
+									size: Number(txt.fontSize) || 36,
+									color: (txt.fontColor as string) || '#FFFFFF',
+									weight: Number(txt.fontWeight) || 400,
+								},
+								alignment: {
+									horizontal: (txt.horizontal as string) || 'center',
+									vertical: (txt.vertical as string) || 'bottom',
+								},
+								background: (txt.background as string) || 'rgba(0,0,0,0.3)',
+							};
+							const capStyle = txt.captionStyle as string;
+							if (capStyle && capStyle !== 'static') {
+								asset.captionStyle = capStyle;
+							}
+							const combineMs = txt.combineMs as number;
+							if (combineMs) {
+								asset.combineMs = Number(combineMs);
+							}
+							const clip: IDataObject = {
+								asset,
+								start: Number(txt.start) || 0,
+								length: Number(txt.length) || totalDuration,
+							};
+							const anim = txt.textAnimation as string;
+							if (anim && anim !== 'none') {
+								clip.textAnimation = anim;
+							}
+							return clip;
+						}),
+					});
+				}
+
+				if (audios.length) {
+					tracks.push({
+						clips: audios.map((a) => ({
+							asset: { type: 'audio', src: a.src },
+							start: Number(a.start) || 0,
+							length: Number(a.length) || totalDuration,
+						})),
+					});
+				}
+
+				const timeline: IDataObject = { tracks };
+
+				if (soundtrack?.src) {
+					timeline.soundtrack = {
+						src: soundtrack.src,
+						volume: Number(soundtrack.volume) || 0.15,
+					};
+				}
+
+				const payload = {
+					timeline,
+					output: {
+						format: 'mp4',
+						resolution,
+						fps,
+					},
+				};
+
+				// POST render
+				const renderResponse = (await remotionApiRequest.call(
+					this,
+					'POST',
+					'/edit/v1/render',
+					payload as unknown as IDataObject,
+				)) as IDataObject;
+
+				if (!renderResponse?.success) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`Render API rejected: ${JSON.stringify(renderResponse)}`,
+					);
+				}
+
+				const responseData = renderResponse.response as IDataObject;
+				const renderId = responseData?.id as string;
+
+				if (!renderId) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`No render ID returned: ${JSON.stringify(renderResponse)}`,
+					);
+				}
+
+				// Poll until done
+				const pollResult = await pollRender.call(this, renderId, baseUrl);
+
+				returnData.push({ json: pollResult as IDataObject });
+			} catch (error: any) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: {
+							error: error.message,
+							errorDetails: error.description || '',
+						},
+					});
+				} else {
+					throw error;
+				}
+			}
+
+			return [returnData];
+		}
+
+		// ---- MANUAL or INPUT JSON mode (per-item) ----
 		for (let i = 0; i < items.length; i++) {
 			try {
-				const inputSource = this.getNodeParameter('inputSource', i, 'manual') as string;
-
-				// ----------------------------------------------------------------
-				// Build timeline from either Input JSON or Manual fields
-				// ----------------------------------------------------------------
 				let images: IDataObject[] = [];
 				let texts: IDataObject[] = [];
 				let audios: IDataObject[] = [];
@@ -572,7 +1196,7 @@ export class RemotionRender implements INodeType {
 					}
 				}
 
-				// Calculate total duration from all clips
+				// Calculate total duration
 				const allClips = [...images, ...texts, ...audios];
 				const totalDuration = allClips.reduce((max, c) => {
 					const start = Number(c.start) || 0;
@@ -624,7 +1248,6 @@ export class RemotionRender implements INodeType {
 								},
 								background: (txt.background as string) || 'rgba(0,0,0,0.3)',
 							};
-							// TikTok captions style
 							const capStyle = txt.captionStyle as string;
 							if (capStyle && capStyle !== 'static') {
 								asset.captionStyle = capStyle;
@@ -638,7 +1261,6 @@ export class RemotionRender implements INodeType {
 								start: Number(txt.start) || 0,
 								length: Number(txt.length) || totalDuration,
 							};
-							// Text animation
 							const anim = txt.textAnimation as string;
 							if (anim && anim !== 'none') {
 								clip.textAnimation = anim;
@@ -676,9 +1298,7 @@ export class RemotionRender implements INodeType {
 					},
 				};
 
-				// ----------------------------------------------------------------
 				// POST render request
-				// ----------------------------------------------------------------
 				const renderResponse = (await remotionApiRequest.call(
 					this,
 					'POST',
@@ -703,9 +1323,7 @@ export class RemotionRender implements INodeType {
 					);
 				}
 
-				// ----------------------------------------------------------------
-				// Poll until done (blocking — runs inside this Code node)
-				// ----------------------------------------------------------------
+				// Poll until done
 				const pollResult = await pollRender.call(this, renderId, baseUrl);
 
 				returnData.push({ json: pollResult as IDataObject });

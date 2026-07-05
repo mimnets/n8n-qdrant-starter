@@ -14,7 +14,7 @@ A lightweight, self-hosted stack combining:
 - **[n8n](https://n8n.io)** — workflow automation engine (400+ integrations)
 - **[Qdrant](https://qdrant.tech)** — vector database for semantic search, RAG, and AI memory
 - **[File Upload API](https://hub.docker.com/r/mimnets/n8n-file-upload)** — self-hosted file storage for images, audio, video, documents
-- **[Remotion Video Render](https://remotion.dev)** — React-powered programmatic video engine with Ken Burns effects, text overlays, TikTok-style captions, crossfade transitions, and multi-track audio
+- **[Remotion Video Render](https://remotion.dev)** — React-powered programmatic video engine with Ken Burns effects, text overlays, TikTok-style captions, crossfade transitions, multi-track audio, and an n8n community node with 3 input modes (Manual / Input JSON / **Auto Collect**)
 - **[Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI)** — text-to-speech with 35+ voices (OpenAI-compatible API)
 
 ## 🏗️ Architecture
@@ -121,7 +121,7 @@ Remotion is a React-powered programmatic video engine. You describe your video a
 [![npm](https://img.shields.io/npm/v/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
 [![npm](https://img.shields.io/npm/dm/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
 
-This project includes a custom n8n community node that wraps the entire Remotion API into a single drag-and-drop node. No need to manually construct JSON payloads or poll for completion.
+This project includes a custom n8n community node that wraps the entire Remotion API into a single drag-and-drop node. No need to manually construct JSON payloads or poll for completion. Three input modes: **Manual** (drag-and-drop), **From Input JSON** (structured data), and **Auto Collect** (★ NEW — auto-detect images/audios/texts from any upstream node).
 
 ### Install
 
@@ -173,6 +173,33 @@ Connect any upstream node that outputs this structure:
 }
 ```
 
+### Usage — Auto Collect Mode (★ NEW — Zero Config)
+
+The node now has an **Auto Collect** mode that detects images, audios, and text overlays automatically from any upstream node. No Code node or manual mapping needed.
+
+**How it works:**
+
+1. Select **Input Method → Auto Collect**
+2. Connect any node that outputs files (image generator, file uploader, AI node, etc.)
+3. The node scans every item and auto-detects:
+   - **File extensions** — `.png`/`.jpg`/`.webp` → image, `.mp3`/`.wav` → audio
+   - **Key names** — `url`, `src`, `image`, `photo`, `caption`, `text`, `soundtrack`
+   - **Explicit `type` field** — set `type: "image"`, `type: "audio"`, `type: "text"`
+   - **content_type/mime** — `image/png`, `audio/mpeg`
+4. Auto-timelines everything: images get sequential duration, audio aligns by index
+
+**Example — 5 images → reel (no Code node):**
+```
+[Image Generator / Upload API] → outputs { url: "img.png" } × 5
+        ↓
+[Remotion Render - Auto Collect]
+   → Detects 5 images
+   → Auto-timelines: each 4s = 20s video
+   → Renders MP4
+```
+
+Adjust defaults under **Auto Collect Defaults**: image duration, effect, text position, audio alignment, resolution, FPS.
+
 ### Output
 
 ```json
@@ -220,7 +247,22 @@ const texts = [{
 return { images, texts, resolution: "vertical", fps: 25 };
 ```
 
-### Example 3: AI Pipeline — Script → TTS → Video
+### Example 3: Zero-Config Auto Collect (★ New)
+
+```
+[Image Generator / Unsplash / File Upload]
+   → 5-10 images, each { url: "img.png" }
+        ↓
+[Remotion Render - Auto Collect]
+   → Detects images automatically
+   → Auto-timelines: each image 4s
+   → Renders video
+   → Returns download URL
+```
+
+No Code node. No manual config. Works whether upstream sends 3 or 20 images.
+
+### Example 4: AI Pipeline — Script → TTS → Video
 
 ```
 [Code Node with script] → [Kokoro TTS] → [Upload Audio]
@@ -262,7 +304,8 @@ POST http://kokoro-tts:8880/v1/audio/speech
 | **n8n can't reach services** | Use Docker service names: `http://remotion:3000`, `http://kokoro-tts:8880` |
 | **Node shows "no credentials"** | Create credential: Server URL = `http://remotion:3000` |
 | **Text stays in center** | Set Vertical Position → **Bottom** + rebuild remotion: `docker compose up -d --build remotion` |
-| **Broken icon in n8n** | Update node to v0.1.1+: `npm i n8n-nodes-remotion-render@latest` |
+| **Broken icon in n8n** | Update node to v0.3.0+: `npm i n8n-nodes-remotion-render@latest` |
+| **Auto Collect detects nothing** | Check file extensions (.png, .jpg, .mp3), or add `"type": "image"` to upstream items |
 | **TikTok captions not highlighting** | Set Caption Style → TikTok Style + Word Timing → 400ms |
 | **Port already in use** | Change host ports in `docker-compose.yml` |
 
