@@ -94,11 +94,12 @@ Remotion is a React-powered programmatic video engine. You describe your video a
 
 | Feature | Description |
 |---------|-------------|
-| 🖼️ **Multiple images** with Ken Burns effects | zoomIn, zoomOut, slideLeft, slideRight, slideUp, slideDown |
+| 🖼️ **Multiple images** with Ken Burns effects | zoomIn (default), zoomOut, slideLeft, slideRight, slideUp, slideDown |
 | 📝 **Text overlays** | Position at bottom (captions), center, or top. Custom font, color, weight |
 | ✨ **Animated text entrances** | Fade In, Slide Up, Scale In, Typewriter — per text clip |
-| 🔡 **TikTok-style captions** | Word-by-word gold highlighting — looks like TikTok/Reels |
-| 🎵 **Multi-track audio** | Scene-specific audio clips + background soundtrack |
+| 🔡 **TikTok-style captions** (default) | Word-by-word gold highlighting with configurable word timing (400ms classic / 1200ms sentence) |
+| 🎵 **Multi-track audio** | Scene-specific audio clips + background soundtrack — full-length playback (no truncation) |
+| 🖼️ **Image fit modes** | `cover` (crop to fill), `contain` (fit inside), `fill` (stretch) — per scene |
 | 🔄 **Crossfade transitions** | Automatic dissolve between overlapping image clips |
 | 🎬 **Resolutions** | preview, mobile, SD, HD, **1080p**, **Vertical/Reels**, 4K |
 | 📐 **Aspect ratios** | 16:9 (horizontal), 9:16 (vertical/reels) |
@@ -121,20 +122,26 @@ Remotion is a React-powered programmatic video engine. You describe your video a
 [![npm](https://img.shields.io/npm/v/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
 [![npm](https://img.shields.io/npm/dm/n8n-nodes-remotion-render)](https://www.npmjs.com/package/n8n-nodes-remotion-render)
 
-This project includes a custom n8n community node that wraps the entire Remotion API into a single drag-and-drop node. No need to manually construct JSON payloads or poll for completion. Three input modes: **Manual** (drag-and-drop), **From Input JSON** (structured data), and **Auto Collect** (★ NEW — auto-detect images/audios/texts from any upstream node).
+This project includes a custom n8n community node that wraps the entire Remotion API into a single drag-and-drop node. No need to manually construct JSON payloads or poll for completion. Five input modes: **Manual** (drag-and-drop), **From Input JSON** (structured data), **⭐ Sequence Combiner** (each upstream item = one scene, ideal for loops), **⚡ Batch Render** (render each scene independently, concat with ffmpeg), and **Auto Collect** (auto-detect images/audios/texts from any upstream node).
 
 ### Install
 
 In n8n: **Settings → Community Nodes → Install** → enter `n8n-nodes-remotion-render`
 
-Or if running n8n in Docker with this stack, add to `docker-compose.yml`:
+Or if running n8n in Docker with this stack, the custom n8n Dockerfile at `n8n/Dockerfile` extends the official image with **ffmpeg** pre-installed (required for Batch Render mode). The n8n node is mounted automatically:
 
 ```yaml
 n8n:
+  build: ./n8n  # Dockerfile with ffmpeg
   environment:
     - N8N_CUSTOM_EXTENSIONS=/home/node/custom-nodes
   volumes:
     - ./n8n-nodes-remotion-render:/home/node/custom-nodes/n8n-nodes-remotion-render
+```
+
+Rebuild n8n to pick up ffmpeg:
+```bash
+docker compose up -d --build n8n
 ```
 
 ### Setup Credential
@@ -372,6 +379,8 @@ n8n-qdrant-starter/
 ├── LICENSE
 ├── scripts/
 │   └── n8n-entrypoint.sh
+├── n8n/                       # Custom n8n Dockerfile (adds ffmpeg)
+│   └── Dockerfile
 ├── remotion/                 # Remotion video render engine
 │   ├── Dockerfile
 │   ├── src/

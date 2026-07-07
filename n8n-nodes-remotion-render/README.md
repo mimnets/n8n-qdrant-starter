@@ -210,6 +210,138 @@ If your upstream outputs items with both `url: "img.jpg"` and `caption: "hello"`
 
 ---
 
+### Input Method: ⭐ Sequence Combiner (★ NEW — from loops)
+
+Perfect when each upstream item is **one scene** and you want to combine them into a single video. Works seamlessly with `SplitInBatches` (loop) output.
+
+1. **Input Method → Sequence Combiner**
+2. Connect the output of a loop, Merge node, or any node that emits scene objects
+3. Map the fields — or leave defaults
+4. Remotion node automatically sequences scenes: Scene 1, Scene 2, Scene 3...
+
+#### How it works
+
+Each upstream item becomes one scene. Scenes are placed end-to-end:
+
+| Scene 1 (0–5s) | Scene 2 (5–12s) | Scene 3 (12–20s) |
+| imageUrl + audioUrl + caption | imageUrl + audioUrl + caption | imageUrl + audioUrl + caption |
+
+#### Field mapping
+
+| Node field | Default | What it maps to |
+|------------|---------|-----------------|
+| Image Field | `imageUrl` | URL of the scene image |
+| Audio Field | `audioUrl` | URL of the scene audio |
+| Text / Caption Field | `voiceOver` | Caption text overlay |
+| Duration Field | `duration` | Scene length in seconds |
+| Default Duration | 5 | Fallback when no duration field |
+
+#### What each upstream item should look like
+
+```json
+{
+  "imageUrl": "https://file.mimnets.com/files/scene1.png",
+  "audioUrl": "https://file.mimnets.com/files/scene1.mp3",
+  "caption": "This is the first scene caption",
+  "duration": 5,
+  "scene_number": 1
+}
+```
+
+#### New: Default image motion (v0.4.0+)
+
+Images now get **`zoomIn` Ken Burns effect by default**, so every scene has smooth camera motion without manual configuration. Set an `effect` field on your item to override:
+
+```json
+{
+  "imageUrl": "...",
+  "audioUrl": "...",
+  "effect": "slideRight"
+}
+```
+
+#### New: TikTok captions by default (v0.4.0+)
+
+Text/captions now default to **TikTok-style word-by-word highlighting** with gold color on each active word. This means captions automatically sync to the spoken audio — no extra config needed.
+
+You can still override to static mode by setting `captionStyle: "static"` on your item, or control word timing with `combineMs: 400` (faster = 400ms, sentence-level = 1200ms).
+
+#### Example workflow — Loop Over Items
+
+```
+[Trigger] → [Sheets] → [Code: parse scenes] → [SplitInBatches]
+    Each iteration → generate image + TTS audio + upload → { imageUrl, audioUrl, caption, duration }
+        ↓
+[Remotion Render - Sequence Combiner]
+   → Receives all scenes from loop
+   → Sequences end-to-end
+   → ONE video with all scenes
+```
+
+**No feedback loops. No wasted renders.** Each loop item = one scene. Remotion renders once at the end.
+
+---
+
+### Input Method: ⚡ Batch Render (Render Each & Concat via ffmpeg)
+
+For workflows where Sequence Combiner has timeline issues (zoom/captions only on first scene), **Batch Render** mode renders each scene as its own separate video, then concatenates them with ffmpeg. No timeline complexity — each scene is a clean, independent render.
+
+1. **Input Method → Batch Render**
+2. Connect any node that outputs scene objects
+3. Each upstream item = one scene — rendered individually, then concat'd
+
+#### How it works
+
+1. Receives all scene items at once
+2. For each scene: sends a single-scene payload to Remotion → polls → downloads the MP4
+3. After all scenes: runs `ffmpeg -f concat -c copy` to join them instantly
+4. Uploads the final combined video to your file-upload server
+5. Returns the download URL
+
+#### Requirements
+
+- **ffmpeg** must be installed in the n8n container. If using Docker, build from `n8n/Dockerfile`:
+  ```bash
+  docker compose up -d --build n8n
+  ```
+- Scenes render **sequentially** (one at a time), so total time = sum of all render durations
+
+#### What each upstream item should look like
+
+```json
+{
+  "imageUrl": "https://file.mimnets.com/files/scene1.png",
+  "audioUrl": "https://file.mimnets.com/files/scene1.mp3",
+  "caption": "First scene caption",
+  "duration": 5,
+  "scene_number": 1
+}
+```
+
+#### Benefits over Sequence Combiner
+
+| Aspect | Sequence Combiner | Batch Render |
+|--------|-------------------|--------------|
+| **Zoom on every scene** | Can miss scenes | ✅ Every scene |
+| **TikTok captions** | Can miss scenes | ✅ Every scene |
+| **Audio overlapping** | Possible | ✅ Never (separate renders) |
+| **Render time** | One render | Multiple renders (N scenes × time) |
+| **ffmpeg required** | No | Yes |
+| **Final concat** | Built into Remotion | Instant (`-c copy`, no re-encode) |
+
+#### Example workflow — two loops + merge + batch render
+
+```
+[Image Loop] → upload → image URLs
+[Audio Loop] → TTS → upload → audio URLs
+[Merge by scene_number]
+   → [Code: build scenes with word-count duration]
+      → [Remotion Render - Batch Render]
+         → Renders each scene → concats → uploads → returns URL
+```
+
+---
+
 ### Output
 
 The node returns:

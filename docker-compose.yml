@@ -34,7 +34,7 @@ services:
 
   n8n:
     <<: *common
-    image: n8nio/n8n:latest
+    build: ./n8n
     container_name: n8n
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     ports:

@@ -192,13 +192,24 @@ ADMIN_HTML = """<!DOCTYPE html>
   .container{padding:20px 24px}
   .toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
   .toolbar .info{font-size:.9rem;color:#64748b}
+  .toolbar .sel-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .toolbar .sel-actions label{font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:4px;color:#475569}
+  .toolbar .sel-actions input[type=checkbox]{width:16px;height:16px;cursor:pointer}
+  .toolbar .btn-pill{padding:6px 16px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:500;background:#fff;transition:background .15s,border-color .15s;white-space:nowrap}
+  .toolbar .btn-pill:hover{background:#f8fafc}
+  .toolbar .btn-pill.danger{color:#dc2626;border-color:#fecaca}
+  .toolbar .btn-pill.danger:hover{background:#fef2f2;border-color:#fca5a5}
+  .toolbar .btn-pill.danger:disabled{opacity:.4;cursor:default}
   .toast{position:fixed;top:16px;right:16px;z-index:9999;padding:12px 20px;border-radius:8px;color:#fff;font-weight:500;font-size:.9rem;animation:slideIn .25s ease;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none}
   .toast.success{background:#16a34a}
   .toast.error{background:#dc2626}
   @keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
-  .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .2s,transform .15s;display:flex;flex-direction:column}
+  .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .2s,transform .15s;display:flex;flex-direction:column;position:relative}
   .card:hover{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-2px)}
+  .card.selected{outline:3px solid #3b82f6;outline-offset:-3px;box-shadow:0 0 0 1px #3b82f6}
+  .card .check{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:4px;border:2px solid #94a3b8;background:rgba(255,255,255,.9);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:background .15s,border-color .15s;font-size:14px;color:transparent;user-select:none}
+  .card .check.checked{background:#3b82f6;border-color:#3b82f6;color:#fff}
   .card .thumb{width:100%;height:160px;object-fit:cover;background:#e2e8f0;cursor:pointer;display:block}
   .card .thumb.placeholder{display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:2.5rem}
   .card .body{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:4px}
@@ -248,7 +259,11 @@ ADMIN_HTML = """<!DOCTYPE html>
 <div class="container">
   <div class="toolbar">
     <span class="info" id="toolbarInfo"></span>
-    <button onclick="refresh()" style="padding:6px 16px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:500">&#x21bb; Refresh</button>
+    <div class="sel-actions">
+      <label><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"> Select all</label>
+      <button class="btn-pill danger" id="deleteSelectedBtn" onclick="confirmBulkDelete()" disabled>&#x1f5d1; Delete selected (<span id="selCount">0</span>)</button>
+    </div>
+    <button onclick="refresh()" class="btn-pill">&#x21bb; Refresh</button>
   </div>
   <div id="content"></div>
 </div>
@@ -347,13 +362,15 @@ function renderGrid() {
     }
 
     const fname = esc(f.filename);
-    html += `<div class="card" id="card-${CSS.escape(f.filename)}">`;
+    const safeFilename = CSS.escape(f.filename);
+    html += `<div class="card" id="card-${safeFilename}" data-filename="${escAttr(f.filename)}">`;
+    html += `<div class="check" id="chk-${safeFilename}" onclick="event.stopPropagation();toggleOne('${escAttr(f.filename)}')">&#x2713;</div>`;
     html += `<a href="${url}" target="_blank">${mediaHtml}</a>`;
     html += `<div class="body">`;
     html += `<span class="fname" title="${fname}">${fname}</span>`;
     html += `<span class="meta"><span>${formatBytes(f.size_bytes)}</span><span>${f.modified}</span></span>`;
     html += `</div>`;
-    html += `<div class="actions"><button onclick="confirmDelete('${escAttr(f.filename)}')">&#x1f5d1; Delete</button></div>`;
+    html += `<div class="actions"><button onclick="event.stopPropagation();confirmDelete('${escAttr(f.filename)}')">&#x1f5d1; Delete</button></div>`;
     html += `</div>`;
   }
   html += '</div>';
@@ -399,6 +416,113 @@ async function doDelete(filename) {
     document.getElementById('toolbarInfo').textContent = state.files.length + ' file' + (state.files.length !== 1 ? 's' : '') + ' \u00b7 ' + formatBytes(state.totalBytes);
     if (state.files.length === 0) renderGrid();
     showToast('Deleted', 'success');
+  } catch(e) {
+    showToast('Failed to delete: ' + e.message, 'error');
+  }
+}
+
+// ================================================================
+// Multi-select logic
+// ================================================================
+const _sel = new Set();
+
+function toggleOne(filename) {
+  if (_sel.has(filename)) {
+    _sel.delete(filename);
+  } else {
+    _sel.add(filename);
+  }
+  updateSelectionUI();
+}
+
+function toggleSelectAll(checked) {
+  _sel.clear();
+  if (checked) {
+    for (const f of state.files) {
+      _sel.add(f.filename);
+    }
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  document.getElementById('selCount').textContent = _sel.size;
+  document.getElementById('deleteSelectedBtn').disabled = _sel.size === 0;
+
+  // Update checkbox state per card
+  for (const f of state.files) {
+    const safe = CSS.escape(f.filename);
+    const card = document.getElementById('card-' + safe);
+    const chk = document.getElementById('chk-' + safe);
+    if (card) {
+      card.classList.toggle('selected', _sel.has(f.filename));
+    }
+    if (chk) {
+      chk.classList.toggle('checked', _sel.has(f.filename));
+    }
+  }
+
+  // Select-all checkbox
+  const allSel = document.getElementById('selectAll');
+  if (allSel) {
+    allSel.checked = state.files.length > 0 && _sel.size === state.files.length;
+    allSel.indeterminate = _sel.size > 0 && _sel.size < state.files.length;
+  }
+}
+
+function confirmBulkDelete() {
+  if (_sel.size === 0) return;
+  const zone = document.getElementById('modalZone');
+  const count = _sel.size;
+  zone.innerHTML = [
+    '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">',
+    '<div class="modal">',
+    '<h3>Delete ' + count + ' file' + (count !== 1 ? 's' : '') + '?</h3>',
+    '<p>This action cannot be undone.</p>',
+    '<div class="btns">',
+    '<button class="cancel" onclick="closeModal()">Cancel</button>',
+    '<button class="confirm" onclick="doBulkDelete()">Delete ' + count + '</button>',
+    '</div>',
+    '</div>',
+    '</div>'
+  ].join('');
+}
+
+async function doBulkDelete() {
+  closeModal();
+  const filenames = Array.from(_sel);
+  const qs = state.apiKey ? '?api_key=' + encodeURIComponent(state.apiKey) : '';
+  try {
+    const r = await fetch('/files/bulk-delete' + qs, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const result = await r.json();
+
+    // Remove deleted files from state and DOM
+    for (const fn of result.deleted) {
+      const safe = CSS.escape(fn);
+      const card = document.getElementById('card-' + safe);
+      if (card) {
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.95)';
+        card.style.transition = 'opacity .2s, transform .2s';
+        setTimeout(() => card.remove(), 200);
+      }
+      _sel.delete(fn);
+    }
+    state.files = state.files.filter(i => !result.deleted.includes(i.filename));
+    state.totalBytes = state.files.reduce((s, i) => s + i.size_bytes, 0);
+    updateStats(state.files.length, state.totalBytes);
+    document.getElementById('toolbarInfo').textContent = state.files.length + ' file' + (state.files.length !== 1 ? 's' : '') + ' \u00b7 ' + formatBytes(state.totalBytes);
+    updateSelectionUI();
+    if (state.files.length === 0) renderGrid();
+
+    let msg = 'Deleted ' + result.deleted.length + ' file' + (result.deleted.length !== 1 ? 's' : '');
+    if (result.failed.length > 0) msg += ', ' + result.failed.length + ' failed';
+    showToast(msg, result.failed.length > 0 ? 'error' : 'success');
   } catch(e) {
     showToast('Failed to delete: ' + e.message, 'error');
   }
@@ -732,6 +856,36 @@ async def delete_file(
         raise HTTPException(status_code=400, detail="Invalid filename")
     file_path.unlink()
     return {"success": True, "filename": filename, "deleted": True}
+
+
+@app.post("/files/bulk-delete")
+async def bulk_delete_files(
+    request: Request,
+    x_api_key: str | None = Header(None),
+    api_key: str | None = Query(None),
+):
+    """Delete multiple files at once. Requires API key."""
+    check_api_key(x_api_key, api_key)
+    body = await request.json()
+    filenames = body.get("filenames", [])
+    if not isinstance(filenames, list) or not filenames:
+        raise HTTPException(status_code=400, detail="Provide a 'filenames' array")
+    deleted = []
+    failed = []
+    for filename in filenames:
+        if not isinstance(filename, str) or ".." in filename or "/" in filename:
+            failed.append({"filename": filename, "reason": "Invalid filename"})
+            continue
+        file_path = UPLOAD_DIR / filename
+        if not file_path.is_file():
+            failed.append({"filename": filename, "reason": "Not found"})
+            continue
+        if UPLOAD_DIR not in file_path.resolve().parents and file_path.resolve() != UPLOAD_DIR.resolve():
+            failed.append({"filename": filename, "reason": "Invalid path"})
+            continue
+        file_path.unlink()
+        deleted.append(filename)
+    return {"success": True, "deleted": deleted, "failed": failed}
 
 
 async def list_files_internal(x_api_key=None, api_key=None):

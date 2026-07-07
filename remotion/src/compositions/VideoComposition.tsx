@@ -146,7 +146,7 @@ const ImageScene: React.FC<{ clip: Clip; totalFrames: number }> = ({ clip, total
   const kb = getKenBurns(clip.effect as KenBurnsEffect, frame, totalFrames);
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
-      <Img src={clip.asset.src!} style={{ width: "100%", height: "100%", objectFit: "cover", ...kb }} />
+      <Img src={clip.asset.src!} style={{ width: "100%", height: "100%", objectFit: (clip as any).fit || "cover", ...kb }} />
     </AbsoluteFill>
   );
 };
@@ -211,9 +211,18 @@ const TikTokCaptionOverlay: React.FC<{ clip: Clip; width: number; height: number
   });
 
   const timeMs = (frame / fps) * 1000;
-  const currentPage = pages.find(
-    (p) => timeMs >= p.startMs && timeMs < p.startMs + (p.durationMs ?? 0)
+  let currentPage = pages.find(
+    (p) => timeMs >= p.startMs && timeMs < p.startMs + (p.durationMs ?? totalMs - p.startMs)
   );
+
+  // If between pages or past last page, show the nearest preceding page
+  if (!currentPage && pages.length > 0) {
+    for (const p of pages) {
+      if (p.startMs <= timeMs) currentPage = p;
+    }
+    // If still null (before first page), use first page
+    if (!currentPage) currentPage = pages[0];
+  }
 
   if (!currentPage) return null;
 
@@ -349,7 +358,7 @@ export const VideoComposition: React.FC<RenderRequest> = ({ timeline, output }) 
   const hasVideo = visualClips.some(
     (c) => currentTime >= c.start && currentTime < c.start + c.length
   );
-  if (!hasVideo && textClips.length === 0) {
+  if (!hasVideo && textClips.length === 0 && audioClips.length === 0) {
     return <AbsoluteFill style={{ background: timeline.background ?? "#000" }} />;
   }
 
@@ -369,13 +378,15 @@ export const VideoComposition: React.FC<RenderRequest> = ({ timeline, output }) 
         <Audio src={timeline.soundtrack.src} volume={timeline.soundtrack.volume ?? 0.15} />
       )}
 
-      {/* Audio clips */}
+      {/* Audio clips — Sequence with durationInFrames.
+          Audio mounts at scene start, unmounts at scene end.
+          Scene duration should match or exceed actual audio length. */}
       {audioClips.map((c, i) => {
         const from = Math.round(c.start * fps);
         const dur = Math.round(c.length * fps);
         return (
           <Sequence key={i} from={from} durationInFrames={dur}>
-            <AudioClip src={c.asset.src ?? ""} volume={1} />
+            <Audio src={c.asset.src ?? ""} volume={1} />
           </Sequence>
         );
       })}

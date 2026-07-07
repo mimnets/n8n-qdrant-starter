@@ -1,3 +1,7 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { execSync } from 'child_process';
+
 import {
 	IExecuteFunctions,
 	IDataObject,
@@ -295,6 +299,12 @@ export class RemotionRender implements INodeType {
 						description:
 							'Treat each upstream item as ONE scene. Perfect for SplitInBatches Done output. Map your fields below.',
 					},
+					{
+						name: '⚡ Batch Render — render each scene & concat via ffmpeg',
+						value: 'batchRender',
+						description:
+							'Render each scene as a separate video via Remotion, then concatenate with ffmpeg. Each scene gets its own zoom + captions + audio without timeline complexity. Requires ffmpeg in n8n container.',
+					},
 				],
 				default: 'manual',
 				displayOptions: {
@@ -418,7 +428,7 @@ export class RemotionRender implements INodeType {
 				name: 'combinerResolution',
 				type: 'options',
 				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+					show: { operation: ['render'], inputSource: ['sequenceCombiner', 'batchRender'] },
 				},
 				options: [
 					{ name: 'Preview (512×288)', value: 'preview' },
@@ -437,11 +447,34 @@ export class RemotionRender implements INodeType {
 				name: 'combinerFps',
 				type: 'number',
 				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+					show: { operation: ['render'], inputSource: ['sequenceCombiner', 'batchRender'] },
 				},
 				default: 30,
 				typeOptions: { minValue: 1, maxValue: 60 },
 				description: 'Frames per second',
+			},
+
+			// ---- Batch Render note ----
+			{
+				displayName:
+					'Each upstream item = one scene. Scenes are rendered INDIVIDUALLY via Remotion, then' +
+					' concatenated with <strong>ffmpeg</strong> into one final video.\n\n' +
+					'<strong>Each upstream item should look like:</strong>\n' +
+					'<code>{"imageUrl": "...", "audioUrl": "...", "caption": "...", "duration": 5}</code>\n\n' +
+					'<strong>Advantages:</strong>\n' +
+					'• Each scene gets its own Ken Burns zoom + TikTok captions + audio\n' +
+					'• No timeline complexity or overlapping issues\n' +
+					'• ffmpeg concat is instant (no re-encoding)\n\n' +
+					'<strong>Requirements:</strong>\n' +
+					'• n8n container must have ffmpeg installed (see n8n/Dockerfile)\n' +
+					'• Scenes render sequentially (one-at-a-time), so total time = sum of each render time\n' +
+					'• The final video is uploaded to the file-upload server and returned as a single URL',
+				name: 'batchRenderNote',
+				type: 'notice',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['batchRender'] },
+				},
+				default: '',
 			},
 
 			// ---- Auto Collect note ----
@@ -1081,6 +1114,7 @@ export class RemotionRender implements INodeType {
 							start: Number(img.start) || 0,
 							length: Number(img.length) || totalDuration,
 							fit: (img.fit as string) || 'cover',
+							effect: (img.effect as string) || 'zoomIn',
 						})),
 					});
 				}
@@ -1094,6 +1128,8 @@ export class RemotionRender implements INodeType {
 								font: { family: 'Inter', size: 36, color: '#FFFFFF', weight: 400 },
 								alignment: { horizontal: 'center', vertical: 'bottom' },
 								background: 'rgba(0,0,0,0.3)',
+								captionStyle: (txt.captionStyle as string) || 'tiktok',
+								combineMs: Number(txt.combineMs) || 400,
 							},
 							start: Number(txt.start) || 0,
 							length: Number(txt.length) || totalDuration,
@@ -1147,6 +1183,189 @@ export class RemotionRender implements INodeType {
 							error: error.message,
 							errorDetails: error.description || '',
 						},
+					});
+				} else {
+					throw error;
+				}
+			}
+
+			return [returnData];
+		}
+
+		if (inputSource === 'batchRender') {
+			// ----------------------------------------------------------------
+			// BATCH RENDER — render each scene individually, concat with ffmpeg
+			// ----------------------------------------------------------------
+			try {
+				const resolution = this.getNodeParameter('combinerResolution', 0, 'vertical') as string;
+				const fps = this.getNodeParameter('combinerFps', 0, 30) as number;
+
+				const tempDir = '/tmp/remotion-batch-' + Date.now();
+				fs.mkdirSync(tempDir, { recursive: true });
+
+				const sceneFiles: string[] = [];
+
+				try {
+					for (let i = 0; i < items.length; i++) {
+						const scene = items[i]?.json as IDataObject;
+						const imageUrl = scene.imageUrl as string || '';
+						const audioUrl = scene.audioUrl as string || '';
+						const caption = scene.caption as string || '';
+						const duration = Number(scene.duration) || 5;
+						const sceneNum = scene.scene_number || (i + 1);
+
+						// Build single-scene Remotion payload
+						const tracks: IDataObject[] = [];
+
+						if (imageUrl) {
+							tracks.push({
+								clips: [{
+									asset: { type: 'image', src: imageUrl },
+									start: 0,
+									length: duration,
+									fit: 'cover',
+									effect: 'zoomIn',
+								}],
+							});
+						}
+
+						if (caption) {
+							tracks.push({
+								clips: [{
+									asset: {
+										type: 'text',
+										text: caption,
+										font: { family: 'Inter', size: 36, color: '#FFFFFF', weight: 400 },
+										alignment: { horizontal: 'center', vertical: 'bottom' },
+										background: 'rgba(0,0,0,0.3)',
+										captionStyle: 'tiktok',
+										combineMs: 400,
+									},
+									start: 0,
+									length: duration,
+								}],
+							});
+						}
+
+						if (audioUrl) {
+							tracks.push({
+								clips: [{
+									asset: { type: 'audio', src: audioUrl },
+									start: 0,
+									length: duration,
+								}],
+							});
+						}
+
+						const payload = {
+							timeline: { tracks },
+							output: { format: 'mp4', resolution, fps },
+						};
+
+						// Send render request
+						const renderRes = await remotionApiRequest.call(
+							this, 'POST', '/edit/v1/render',
+							payload as unknown as IDataObject,
+						) as IDataObject;
+
+						if (!renderRes?.success) {
+							throw new NodeOperationError(
+								this.getNode(),
+								`Scene ${sceneNum} render rejected: ${JSON.stringify(renderRes)}`,
+							);
+						}
+
+						const renderId = (renderRes.response as IDataObject)?.id as string;
+						if (!renderId) {
+							throw new NodeOperationError(this.getNode(), `No render ID for scene ${sceneNum}`);
+						}
+
+						// Poll until done
+						const pollResult = await pollRender.call(this, renderId, baseUrl);
+						const videoUrl = pollResult.videoUrl as string;
+
+						if (!videoUrl) {
+							throw new NodeOperationError(this.getNode(), `No video URL for scene ${sceneNum}`);
+						}
+
+						// Download the scene video
+						const videoBuffer = await remotionApiRequest.call(this, 'GET', videoUrl);
+						const safeName = `scene_${String(sceneNum).padStart(3, '0')}.mp4`;
+						const outPath = path.join(tempDir, safeName);
+						fs.writeFileSync(outPath, Buffer.from(videoBuffer as any));
+						sceneFiles.push(outPath);
+					}
+
+					if (sceneFiles.length === 0) {
+						throw new NodeOperationError(this.getNode(), 'No scenes rendered');
+					}
+
+					// Concat all scene videos with ffmpeg
+					const listPath = path.join(tempDir, 'files.txt');
+					const listContent = sceneFiles.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
+					fs.writeFileSync(listPath, listContent);
+
+					const finalPath = path.join(tempDir, 'final.mp4');
+					try {
+						execSync(
+							`ffmpeg -f concat -safe 0 -i "${listPath}" -c copy "${finalPath}"`,
+							{ stdio: 'pipe', timeout: 60000 },
+						);
+					} catch (ffmpegErr: any) {
+						throw new NodeOperationError(
+							this.getNode(),
+							`ffmpeg concat failed: ${ffmpegErr.message || ffmpegErr}`,
+						);
+					}
+
+					// Upload final video to file-upload server
+					const finalBuf = fs.readFileSync(finalPath);
+					const finalName = `batch_${Date.now()}.mp4`;
+
+					const uploadRes = await this.helpers.request({
+						method: 'POST',
+						url: 'http://file-upload:8001/upload',
+						headers: {
+							'Content-Type': 'multipart/form-data',
+						},
+						formData: {
+							file: {
+								value: finalBuf as any,
+								options: {
+									filename: finalName,
+									contentType: 'video/mp4',
+								},
+							},
+						},
+					});
+
+					const uploadData = typeof uploadRes === 'string'
+						? JSON.parse(uploadRes)
+						: uploadRes;
+
+					returnData.push({
+						json: {
+							status: 'done',
+							scenesProcessed: items.length,
+							videoUrl: uploadData.url,
+							downloadUrl: uploadData.url,
+						} as IDataObject,
+					});
+				} finally {
+					// Cleanup temp files
+					try {
+						fs.rmSync(tempDir, { recursive: true, force: true });
+					} catch {
+						// ignore cleanup errors
+					}
+				}
+			} catch (error: any) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: {
+							error: error.message,
+							errorDetails: error.description || '',
+						} as IDataObject,
 					});
 				} else {
 					throw error;
