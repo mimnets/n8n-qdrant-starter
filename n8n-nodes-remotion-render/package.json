@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-remotion-render",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "n8n community node for rendering videos using your self-hosted Remotion server. Supports multiple images with Ken Burns effects, text overlays with alignment, multi-track audio, dynamic input from upstream nodes, and Auto Collect mode that detects images/audios/texts automatically.",
   "keywords": [
     "n8n",

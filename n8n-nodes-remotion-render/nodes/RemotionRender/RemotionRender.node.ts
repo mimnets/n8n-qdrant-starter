@@ -289,6 +289,12 @@ export class RemotionRender implements INodeType {
 						description:
 							'Collect all incoming items, detect images/audios/texts automatically, and build the timeline',
 					},
+					{
+						name: '⭐ Sequence Combiner — combine multiple items into one video',
+						value: 'sequenceCombiner',
+						description:
+							'Treat each upstream item as ONE scene. Perfect for SplitInBatches Done output. Map your fields below.',
+					},
 				],
 				default: 'manual',
 				displayOptions: {
@@ -307,6 +313,135 @@ export class RemotionRender implements INodeType {
 					show: { operation: ['render'], inputSource: ['inputJson'] },
 				},
 				default: '',
+			},
+
+			// ---- Combine multiple items toggle ----
+			{
+				displayName:
+					'⭐ Combine Multiple Items into Sequence',
+				name: 'combineItems',
+				type: 'boolean',
+				default: false,
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['inputJson'] },
+				},
+				description:
+					'When enabled, ALL upstream items are combined into ONE video. Each item = one scene with imageUrl, audioUrl, voiceOver, duration.',
+			},
+
+			// ---- Combine items note ----
+			{
+				displayName:
+					'Each upstream item should have:\n• imageUrl or url → image\n• audioUrl → audio clip\n• voiceOver or voice_over → text caption\n• duration (seconds) → scene length\n\nItems are sequenced automatically from first to last.',
+				name: 'combineItemsNote',
+				type: 'notice',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['inputJson'], combineItems: [true] },
+				},
+				default: '',
+			},
+
+			// ================================================================
+			// SEQUENCE COMBINER — Field mapping & options
+			// ================================================================
+			{
+				displayName:
+					'Each upstream item = one scene. Fields auto-detect these keys, or type your own:',
+				name: 'seqCombinerNote',
+				type: 'notice',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: '',
+			},
+			{
+				displayName: 'Image Field',
+				name: 'imageField',
+				type: 'string',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: 'imageUrl',
+				description:
+					'Field name for image URL. Also checks: url, src, img_url, image_url, photo',
+				placeholder: 'imageUrl',
+			},
+			{
+				displayName: 'Audio Field',
+				name: 'audioField',
+				type: 'string',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: 'audioUrl',
+				description:
+					'Field name for audio URL. Also checks: audio_url, voice, voice_url, clip',
+				placeholder: 'audioUrl',
+			},
+			{
+				displayName: 'Text / Caption Field',
+				name: 'textField',
+				type: 'string',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: 'voiceOver',
+				description:
+					'Field name for text overlay. Also checks: voice_over, Voiceover_Text, text, caption, title',
+				placeholder: 'voiceOver',
+			},
+			{
+				displayName: 'Duration Field',
+				name: 'durationField',
+				type: 'string',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: 'duration',
+				description:
+					'Field name for scene duration in seconds. Also checks: length, video_length, time',
+				placeholder: 'duration',
+			},
+			{
+				displayName: 'Default Duration (seconds)',
+				name: 'defaultDuration',
+				type: 'number',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: 5,
+				typeOptions: { minValue: 1, maxValue: 60 },
+				description: 'Used when no duration field is found on an item',
+			},
+			{
+				displayName: 'Resolution',
+				name: 'combinerResolution',
+				type: 'options',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				options: [
+					{ name: 'Preview (512×288)', value: 'preview' },
+					{ name: 'Mobile (640×360)', value: 'mobile' },
+					{ name: 'SD (1024×576)', value: 'sd' },
+					{ name: 'HD (1280×720)', value: 'hd' },
+					{ name: 'Full HD (1920×1080)', value: '1080' },
+					{ name: 'Vertical / Reels (1080×1920)', value: 'vertical' },
+					{ name: '4K (3840×2160)', value: '4k' },
+				],
+				default: 'vertical',
+				description: 'Video resolution for the combined output',
+			},
+			{
+				displayName: 'FPS',
+				name: 'combinerFps',
+				type: 'number',
+				displayOptions: {
+					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
+				},
+				default: 30,
+				typeOptions: { minValue: 1, maxValue: 60 },
+				description: 'Frames per second',
 			},
 
 			// ---- Auto Collect note ----
@@ -870,6 +1005,157 @@ export class RemotionRender implements INodeType {
 		// or per-item for manual/inputJson
 		const inputSource = this.getNodeParameter('inputSource', 0, 'manual') as string;
 
+		if (inputSource === 'sequenceCombiner') {
+			// ----------------------------------------------------------------
+			// SEQUENCE COMBINER — each item = one scene, combine into one video
+			// ----------------------------------------------------------------
+			try {
+				const imageField = this.getNodeParameter('imageField', 0, 'imageUrl') as string;
+				const audioField = this.getNodeParameter('audioField', 0, 'audioUrl') as string;
+				const textField = this.getNodeParameter('textField', 0, 'voiceOver') as string;
+				const durationField = this.getNodeParameter('durationField', 0, 'duration') as string;
+				const defaultDuration = this.getNodeParameter('defaultDuration', 0, 5) as number;
+				const resolution = this.getNodeParameter('combinerResolution', 0, 'vertical') as string;
+				const fps = this.getNodeParameter('combinerFps', 0, 30) as number;
+
+				// Fallback field names to check when the configured field is empty
+				const imageFallbacks = ['imageUrl', 'url', 'src', 'img_url', 'image_url', 'photo'];
+				const audioFallbacks = ['audioUrl', 'audio_url', 'voice', 'voice_url', 'clip'];
+				const textFallbacks = ['voiceOver', 'voice_over', 'Voiceover_Text', 'text', 'caption', 'title'];
+				const durationFallbacks = ['duration', 'length', 'video_length', 'time'];
+
+				function getField(item: IDataObject, field: string, fallbacks: string[], defaultVal: any): any {
+					const keys = [field, ...fallbacks.filter(f => f !== field)];
+					for (const k of keys) {
+						const val = item[k];
+						if (val !== undefined && val !== null && val !== '') return val;
+					}
+					return defaultVal;
+				}
+
+				let currentStart = 0;
+				const images: IDataObject[] = [];
+				const audios: IDataObject[] = [];
+				const texts: IDataObject[] = [];
+
+				for (let i = 0; i < items.length; i++) {
+					const item = items[i]?.json as IDataObject;
+
+					const imageUrl = getField(item, imageField, imageFallbacks, '');
+					const audioUrl = getField(item, audioField, audioFallbacks, '');
+					const textVal = getField(item, textField, textFallbacks, '');
+					const duration = Number(getField(item, durationField, durationFallbacks, defaultDuration)) || defaultDuration;
+
+					if (imageUrl) {
+						images.push({ src: String(imageUrl), start: currentStart, length: duration });
+					}
+					if (audioUrl) {
+						audios.push({ src: String(audioUrl), start: currentStart, length: duration });
+					}
+					if (textVal) {
+						texts.push({
+							text: String(textVal),
+							start: currentStart,
+							length: duration,
+							vertical: 'bottom',
+							fontSize: 36,
+							fontColor: '#FFFFFF',
+						});
+					}
+
+					currentStart += duration;
+				}
+
+				// Build timeline
+				const allClips = [...images, ...texts, ...audios];
+				const totalDuration = allClips.reduce((max, c) => {
+					return Math.max(max, (Number(c.start) || 0) + (Number(c.length) || 5));
+				}, 0) || 5;
+
+				const tracks: IDataObject[] = [];
+
+				if (images.length) {
+					tracks.push({
+						clips: images.map((img) => ({
+							asset: { type: 'image', src: img.src },
+							start: Number(img.start) || 0,
+							length: Number(img.length) || totalDuration,
+							fit: (img.fit as string) || 'cover',
+						})),
+					});
+				}
+
+				if (texts.length) {
+					tracks.push({
+						clips: texts.map((txt) => ({
+							asset: {
+								type: 'text',
+								text: txt.text || '',
+								font: { family: 'Inter', size: 36, color: '#FFFFFF', weight: 400 },
+								alignment: { horizontal: 'center', vertical: 'bottom' },
+								background: 'rgba(0,0,0,0.3)',
+							},
+							start: Number(txt.start) || 0,
+							length: Number(txt.length) || totalDuration,
+						})),
+					});
+				}
+
+				if (audios.length) {
+					tracks.push({
+						clips: audios.map((a) => ({
+							asset: { type: 'audio', src: a.src },
+							start: Number(a.start) || 0,
+							length: Number(a.length) || totalDuration,
+						})),
+					});
+				}
+
+				const timeline: IDataObject = { tracks };
+				const payload = { timeline, output: { format: 'mp4', resolution, fps } };
+
+				const renderResponse = (await remotionApiRequest.call(
+					this,
+					'POST',
+					'/edit/v1/render',
+					payload as unknown as IDataObject,
+				)) as IDataObject;
+
+				if (!renderResponse?.success) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`Render API rejected: ${JSON.stringify(renderResponse)}`,
+					);
+				}
+
+				const responseData = renderResponse.response as IDataObject;
+				const renderId = responseData?.id as string;
+
+				if (!renderId) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`No render ID returned: ${JSON.stringify(renderResponse)}`,
+					);
+				}
+
+				const pollResult = await pollRender.call(this, renderId, baseUrl);
+				returnData.push({ json: pollResult as IDataObject });
+			} catch (error: any) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: {
+							error: error.message,
+							errorDetails: error.description || '',
+						},
+					});
+				} else {
+					throw error;
+				}
+			}
+
+			return [returnData];
+		}
+
 		if (inputSource === 'autoCollect') {
 			// ----------------------------------------------------------------
 			// AUTO COLLECT MODE — single render from all upstream items
@@ -1139,7 +1425,186 @@ export class RemotionRender implements INodeType {
 			return [returnData];
 		}
 
-		// ---- MANUAL or INPUT JSON mode (per-item) ----
+		// ---- MANUAL or INPUT JSON mode (per-item or combined) ----
+
+		// Check if combineItems mode is enabled (multi-scene from multiple upstream items)
+		const combineItems = inputSource === 'inputJson'
+			? this.getNodeParameter('combineItems', 0, false) as boolean
+			: false;
+
+		if (inputSource === 'inputJson' && combineItems && items.length > 1) {
+			// ----------------------------------------------------------------
+			// COMBINED MODE — multiple items → single video with sequential scenes
+			// ----------------------------------------------------------------
+			try {
+				const combinedImages: IDataObject[] = [];
+				const combinedTexts: IDataObject[] = [];
+				const combinedAudios: IDataObject[] = [];
+				let soundtrack: IDataObject | null = null;
+				let resolution = '1080';
+				let fps = 25;
+				let currentStart = 0;
+
+				for (let i = 0; i < items.length; i++) {
+					const item = items[i]?.json as IDataObject;
+
+					// First item may have structured arrays overrides
+					if (i === 0) {
+						if (Array.isArray(item.images)) {
+							// Upstream sent structured arrays → use them directly
+							combinedImages.push(...item.images as IDataObject[]);
+						}
+						if (Array.isArray(item.texts)) {
+							combinedTexts.push(...item.texts as IDataObject[]);
+						}
+						if (Array.isArray(item.audios)) {
+							combinedAudios.push(...item.audios as IDataObject[]);
+						}
+						if (typeof item.soundtrack === 'object') {
+							soundtrack = item.soundtrack as IDataObject;
+						}
+						if (item.resolution) resolution = String(item.resolution);
+						if (item.fps) fps = Number(item.fps);
+					}
+
+					// Treat each item as ONE scene
+					const imageUrl = String(item.imageUrl || item.url || item.img_url || '');
+					const audioUrl = String(item.audioUrl || item.audio_url || '');
+					const voiceOver = String(item.voiceOver || item.voice_over || item.Voiceover_Text || item.text || item.caption || '');
+					const duration = Number(item.duration || item.video_length || 5);
+
+					if (imageUrl) {
+						combinedImages.push({ src: imageUrl, start: currentStart, length: duration });
+					}
+					if (audioUrl) {
+						combinedAudios.push({ src: audioUrl, start: currentStart, length: duration });
+					}
+					if (voiceOver) {
+						combinedTexts.push({
+							text: voiceOver,
+							start: currentStart,
+							length: duration,
+							vertical: 'bottom',
+							fontSize: 36,
+							fontColor: '#FFFFFF',
+						});
+					}
+
+					currentStart += duration;
+				}
+
+				// Build and send ONE render with all scenes
+				const allClips = [...combinedImages, ...combinedTexts, ...combinedAudios];
+				const totalDuration = allClips.reduce((max, c) => {
+					const start = Number(c.start) || 0;
+					const len = Number(c.length) || 5;
+					return Math.max(max, start + len);
+				}, 0) || 5;
+
+				const tracks: IDataObject[] = [];
+
+				if (combinedImages.length) {
+					tracks.push({
+						clips: combinedImages.map((img) => ({
+							asset: { type: 'image', src: img.src },
+							start: Number(img.start) || 0,
+							length: Number(img.length) || totalDuration,
+							fit: (img.fit as string) || 'cover',
+							effect: (img.effect as string) || undefined,
+						})),
+					});
+				}
+
+				if (combinedTexts.length) {
+					tracks.push({
+						clips: combinedTexts.map((txt) => ({
+							asset: {
+								type: 'text',
+								text: txt.text || '',
+								font: {
+									family: (txt.fontFamily as string) || 'Inter',
+									size: Number(txt.fontSize) || 36,
+									color: (txt.fontColor as string) || '#FFFFFF',
+									weight: Number(txt.fontWeight) || 400,
+								},
+								alignment: {
+									horizontal: (txt.horizontal as string) || 'center',
+									vertical: (txt.vertical as string) || 'bottom',
+								},
+								background: (txt.background as string) || 'rgba(0,0,0,0.3)',
+							},
+							start: Number(txt.start) || 0,
+							length: Number(txt.length) || totalDuration,
+						})),
+					});
+				}
+
+				if (combinedAudios.length) {
+					tracks.push({
+						clips: combinedAudios.map((a) => ({
+							asset: { type: 'audio', src: a.src },
+							start: Number(a.start) || 0,
+							length: Number(a.length) || totalDuration,
+						})),
+					});
+				}
+
+				const timeline: IDataObject = { tracks };
+				if (soundtrack?.src) {
+					timeline.soundtrack = {
+						src: soundtrack.src,
+						volume: Number(soundtrack.volume) || 0.15,
+					};
+				}
+
+				const payload = {
+					timeline,
+					output: { format: 'mp4', resolution, fps },
+				};
+
+				const renderResponse = (await remotionApiRequest.call(
+					this,
+					'POST',
+					'/edit/v1/render',
+					payload as unknown as IDataObject,
+				)) as IDataObject;
+
+				if (!renderResponse?.success) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`Render API rejected: ${JSON.stringify(renderResponse)}`,
+					);
+				}
+
+				const responseData = renderResponse.response as IDataObject;
+				const renderId = responseData?.id as string;
+
+				if (!renderId) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`No render ID returned: ${JSON.stringify(renderResponse)}`,
+					);
+				}
+
+				const pollResult = await pollRender.call(this, renderId, baseUrl);
+				returnData.push({ json: pollResult as IDataObject });
+			} catch (error: any) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: {
+							error: error.message,
+							errorDetails: error.description || '',
+						},
+					});
+				} else {
+					throw error;
+				}
+			}
+
+			return [returnData];
+		}
+
+		// ---- Original per-item processing (manual or non-combined inputJson) ----
 		for (let i = 0; i < items.length; i++) {
 			try {
 				let images: IDataObject[] = [];
