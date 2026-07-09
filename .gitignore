@@ -56,3 +56,4 @@ remotion/dist/
 # n8n community node
 n8n-nodes-remotion-render/node_modules/
 n8n-nodes-remotion-render/dist/
+*.bak

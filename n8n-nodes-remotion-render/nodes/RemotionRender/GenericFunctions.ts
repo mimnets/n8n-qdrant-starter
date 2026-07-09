@@ -11,15 +11,29 @@ export async function remotionApiRequest(
 	query: IDataObject = {},
 ): Promise<any> {
 	const credentials = await this.getCredentials('remotionRenderApi');
-	const baseUrl = (credentials.serverUrl as string).replace(/\/+$/, '');
+	let baseUrl = (credentials.serverUrl as string) || '';
+	baseUrl = baseUrl.replace(/\/+$/, '');
+
+	// Auto-add protocol if missing
+	if (baseUrl && !/^https?:\/\//i.test(baseUrl)) {
+		baseUrl = `http://${baseUrl}`;
+	}
+
+	// Fallback to Docker container name
+	if (!baseUrl) {
+		baseUrl = 'http://remotion:3000';
+	}
+
 	const apiKey = (credentials.apiKey as string) || '';
+
+	const requestUrl = `${baseUrl}${path}`;
 
 	const options: any = {
 		method,
 		headers: {
 			'Content-Type': 'application/json',
 		},
-		uri: `${baseUrl}${path}`,
+		uri: requestUrl,
 		qs: query,
 		json: true,
 	};
@@ -42,7 +56,7 @@ export async function remotionApiRequest(
 	} catch (error: any) {
 		throw new NodeOperationError(
 			this.getNode(),
-			`Remotion server error: ${error.message}`,
+			`Remotion server error: ${error.message} (url: ${requestUrl})`,
 		);
 	}
 }

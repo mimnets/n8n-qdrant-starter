@@ -13,196 +13,14 @@ import {
 import { remotionApiRequest, pollRender } from './GenericFunctions';
 
 // -------------------------------------------------------------------
-// Types
+// Helper: get field with fallback chain
 // -------------------------------------------------------------------
-interface DetectedAsset {
-	type: 'image' | 'audio' | 'text' | 'soundtrack';
-	src?: string;
-	text?: string;
-	meta: IDataObject;
-}
-
-// -------------------------------------------------------------------
-// Detection helpers
-// -------------------------------------------------------------------
-
-/** Known keys that strongly suggest an item IS an image */
-const IMAGE_KEYS = new Set([
-	'image', 'image_url', 'imageUrl', 'img', 'photo', 'photo_url', 'photoUrl',
-	'thumbnail', 'thumbnail_url', 'thumbnailUrl',
-]);
-
-/** Known keys that strongly suggest an item IS an audio clip */
-const AUDIO_KEYS = new Set([
-	'audio', 'audio_url', 'audioUrl', 'voice', 'voice_url', 'voiceUrl',
-	'voiceover', 'voice_over', 'voiceOver', 'clip',
-]);
-
-/** Known keys that strongly suggest background music */
-const SOUNDTRACK_KEYS = new Set([
-	'soundtrack', 'bgm', 'background_music', 'backgroundMusic',
-	'music', 'music_url', 'musicUrl',
-]);
-
-/** Known keys that strongly suggest a text overlay */
-const TEXT_KEYS = new Set([
-	'text', 'caption', 'title', 'headline', 'subtitle', 'overlay',
-	'label', 'description',
-]);
-
-/** File extensions that indicate image */
-const IMAGE_EXTENSIONS = new Set([
-	'.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.bmp', '.svg',
-]);
-
-/** File extensions that indicate audio */
-const AUDIO_EXTENSIONS = new Set([
-	'.mp3', '.wav', '.ogg', '.aac', '.m4a', '.flac', '.wma', '.opus',
-]);
-
-function getExtensionLower(url: string): string {
-	try {
-		const pathname = new URL(url).pathname;
-		const dot = pathname.lastIndexOf('.');
-		return dot >= 0 ? pathname.slice(dot).toLowerCase() : '';
-	} catch {
-		const dot = url.lastIndexOf('.');
-		return dot >= 0 ? url.slice(dot).toLowerCase() : '';
+function getVal(item: IDataObject, fallbacks: string[], defaultVal: any): any {
+	for (const k of fallbacks) {
+		const val = item[k];
+		if (val !== undefined && val !== null && val !== '') return val;
 	}
-}
-
-function hasKey(item: IDataObject, keys: Set<string>): string | null {
-	for (const k of Object.keys(item)) {
-		if (keys.has(k)) return k;
-	}
-	return null;
-}
-
-function isDefined(val: unknown): boolean {
-	return val !== undefined && val !== null && val !== '';
-}
-
-/**
- * Classify a single upstream item into one or more asset types.
- * Returns an array because a single item could contain both an image url
- * and a text caption (e.g. a social media post).
- */
-function classifyItem(item: IDataObject): DetectedAsset[] {
-	const results: DetectedAsset[] = [];
-
-	// If the item has a `type` field that tells us directly
-	const explicitType = item.type as string | undefined;
-	if (explicitType) {
-		const t = explicitType.toLowerCase();
-		if (t === 'image' || t === 'photo') {
-			const src = (item.url || item.src || item.image_url || item.imageUrl) as string;
-			if (isDefined(src)) {
-				results.push({ type: 'image', src: String(src), meta: { ...item } });
-				return results; // explicit type → don't also classify as other things
-			}
-		}
-		if (t === 'audio' || t === 'voice' || t === 'voiceover') {
-			const src = (item.url || item.src || item.audio_url || item.audioUrl) as string;
-			if (isDefined(src)) {
-				results.push({ type: 'audio', src: String(src), meta: { ...item } });
-				return results;
-			}
-		}
-		if (t === 'soundtrack' || t === 'bgm' || t === 'music') {
-			const src = (item.url || item.src) as string;
-			if (isDefined(src)) {
-				results.push({ type: 'soundtrack', src: String(src), meta: { ...item } });
-				return results;
-			}
-		}
-		if (t === 'text' || t === 'caption' || t === 'subtitle') {
-			const txt = (item.text || item.caption || item.content) as string;
-			if (isDefined(txt)) {
-				results.push({ type: 'text', text: String(txt), meta: { ...item } });
-				return results;
-			}
-		}
-		// Unknown type — fall through to auto-detection
-	}
-
-	// Check if item is a soundtrack candidate (special keys)
-	const soundtrackKey = hasKey(item, SOUNDTRACK_KEYS);
-	if (soundtrackKey) {
-		const val = item[soundtrackKey];
-		if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
-			results.push({ type: 'soundtrack', src: String((val as IDataObject).src || (val as IDataObject).url || ''), meta: val as IDataObject });
-			return results;
-		}
-		if (typeof val === 'string') {
-			results.push({ type: 'soundtrack', src: val, meta: { src: val } });
-			return results;
-		}
-	}
-
-	// Collect url/src candidates
-	const urlCandidates: string[] = [];
-	const url = item.url as string;
-	const src = item.src as string;
-	if (isDefined(url)) urlCandidates.push(String(url));
-	if (isDefined(src) && src !== url) urlCandidates.push(String(src));
-
-	// Also check known key aliases
-	const imageKey = hasKey(item, IMAGE_KEYS);
-	if (imageKey) {
-		const val = item[imageKey];
-		if (typeof val === 'string') urlCandidates.push(val);
-	}
-	const audioKey = hasKey(item, AUDIO_KEYS);
-	if (audioKey && !audioKey.startsWith('image')) {
-		const val = item[audioKey];
-		if (typeof val === 'string' && !urlCandidates.includes(val)) urlCandidates.push(val);
-	}
-
-	// Classify each url by extension
-	for (const candidateUrl of urlCandidates) {
-		const ext = getExtensionLower(candidateUrl);
-		if (IMAGE_EXTENSIONS.has(ext)) {
-			// Already has this url as image? skip duplicate
-			if (!results.some(r => r.type === 'image' && r.src === candidateUrl)) {
-				results.push({ type: 'image', src: candidateUrl, meta: { ...item } });
-			}
-		} else if (AUDIO_EXTENSIONS.has(ext)) {
-			if (!results.some(r => r.type === 'audio' && r.src === candidateUrl)) {
-				results.push({ type: 'audio', src: candidateUrl, meta: { ...item } });
-			}
-		} else {
-			// Unknown extension — guess by key name
-			if (imageKey && results.length === 0) {
-				results.push({ type: 'image', src: candidateUrl, meta: { ...item } });
-			} else if (audioKey && !results.some(r => r.type === 'audio')) {
-				results.push({ type: 'audio', src: candidateUrl, meta: { ...item } });
-			}
-		}
-	}
-
-	// Check for text content
-	const textKey = hasKey(item, TEXT_KEYS);
-	if (textKey) {
-		const txt = item[textKey] as string;
-		if (isDefined(txt)) {
-			results.push({ type: 'text', text: String(txt), meta: { ...item } });
-		}
-	}
-
-	// Check for content_type / mime hints
-	const contentType = (item.content_type || item.mime_type || item.mime) as string | undefined;
-	if (contentType && results.length === 0) {
-		const ct = contentType.toLowerCase();
-		if (ct.startsWith('image/')) {
-			const candidate = (url || item.src || '') as string;
-			if (isDefined(candidate)) results.push({ type: 'image', src: String(candidate), meta: { ...item } });
-		} else if (ct.startsWith('audio/')) {
-			const candidate = (url || item.src || '') as string;
-			if (isDefined(candidate)) results.push({ type: 'audio', src: String(candidate), meta: { ...item } });
-		}
-	}
-
-	return results;
+	return defaultVal;
 }
 
 // -------------------------------------------------------------------
@@ -268,7 +86,7 @@ export class RemotionRender implements INodeType {
 			},
 
 			// ================================================================
-			// INPUT SOURCE — "Manual", "From Input JSON", or "Auto Collect"
+			// INPUT SOURCE — Manual or Batch Render
 			// ================================================================
 			{
 				displayName: 'Input Method',
@@ -282,28 +100,10 @@ export class RemotionRender implements INodeType {
 						description: 'Add images, text, and audio clips manually in the node UI',
 					},
 					{
-						name: 'From Input JSON — use upstream data',
-						value: 'inputJson',
-						description:
-							'Read images[], texts[], audios[] from the previous node\'s output JSON',
-					},
-					{
-						name: 'Auto Collect — detect all upstream items',
-						value: 'autoCollect',
-						description:
-							'Collect all incoming items, detect images/audios/texts automatically, and build the timeline',
-					},
-					{
-						name: '⭐ Sequence Combiner — combine multiple items into one video',
-						value: 'sequenceCombiner',
-						description:
-							'Treat each upstream item as ONE scene. Perfect for SplitInBatches Done output. Map your fields below.',
-					},
-					{
 						name: '⚡ Batch Render — render each scene & concat via ffmpeg',
 						value: 'batchRender',
 						description:
-							'Render each scene as a separate video via Remotion, then concatenate with ffmpeg. Each scene gets its own zoom + captions + audio without timeline complexity. Requires ffmpeg in n8n container.',
+							'Each upstream item = one scene. Renders individually via Remotion, then concatenates with ffmpeg. Returns the final video as binary output (no internal upload). Scene items can override defaults per-item.',
 					},
 				],
 				default: 'manual',
@@ -313,122 +113,35 @@ export class RemotionRender implements INodeType {
 				description: 'How to provide the timeline data for rendering',
 			},
 
-			// ---- Input JSON note ----
+			// ---- Batch Render options ----
 			{
 				displayName:
-					'The node will read the following keys from the upstream JSON:\n\n- <strong>images</strong>: [{ src, start, length, effect, fit }]\n- <strong>texts</strong>: [{ text, start, length, vertical, horizontal, fontSize, fontColor, fontFamily }]\n- <strong>audios</strong>: [{ src, start, length }]\n- <strong>soundtrack</strong>: { src, volume }\n- <strong>resolution</strong>: "1080"\n- <strong>fps</strong>: 25\n\nAll fields are optional. Connect a Code node or any upstream node that outputs this structure.',
-				name: 'inputJsonNote',
+					'<strong>Each upstream item should look like:</strong>\n' +
+					'<code>{"imageUrl": "...", "audioUrl": "...", "caption": "...", "duration": 5, "effect": "slideLeft", "fontColor": "#FFD700"}</code>\n\n' +
+					'<strong>How it works:</strong>\n' +
+					'• Each scene is rendered individually via Remotion (one-at-a-time)\n' +
+					'• Scenes are concatenated with ffmpeg (instant, no re-encode)\n' +
+					'• The final video is returned as binary data — connect downstream nodes to handle upload\n\n' +
+					'<strong>Per-item overrides (optional):</strong>\n' +
+					'Each item can override defaults via fields: effect, fit, fadeIn, fadeOut, ' +
+					'fontSize, fontColor, fontFamily, fontWeight, background, ' +
+					'captionStyle, combineMs, textAnimation, vertical, horizontal\n\n' +
+					'<strong>Requirements:</strong>\n' +
+					'• n8n container must have ffmpeg installed\n' +
+					'• Total time = sum of each scene render time',
+				name: 'batchRenderNote',
 				type: 'notice',
 				displayOptions: {
-					show: { operation: ['render'], inputSource: ['inputJson'] },
+					show: { operation: ['render'], inputSource: ['batchRender'] },
 				},
 				default: '',
-			},
-
-			// ---- Combine multiple items toggle ----
-			{
-				displayName:
-					'⭐ Combine Multiple Items into Sequence',
-				name: 'combineItems',
-				type: 'boolean',
-				default: false,
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['inputJson'] },
-				},
-				description:
-					'When enabled, ALL upstream items are combined into ONE video. Each item = one scene with imageUrl, audioUrl, voiceOver, duration.',
-			},
-
-			// ---- Combine items note ----
-			{
-				displayName:
-					'Each upstream item should have:\n• imageUrl or url → image\n• audioUrl → audio clip\n• voiceOver or voice_over → text caption\n• duration (seconds) → scene length\n\nItems are sequenced automatically from first to last.',
-				name: 'combineItemsNote',
-				type: 'notice',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['inputJson'], combineItems: [true] },
-				},
-				default: '',
-			},
-
-			// ================================================================
-			// SEQUENCE COMBINER — Field mapping & options
-			// ================================================================
-			{
-				displayName:
-					'Each upstream item = one scene. Fields auto-detect these keys, or type your own:',
-				name: 'seqCombinerNote',
-				type: 'notice',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
-				},
-				default: '',
-			},
-			{
-				displayName: 'Image Field',
-				name: 'imageField',
-				type: 'string',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
-				},
-				default: 'imageUrl',
-				description:
-					'Field name for image URL. Also checks: url, src, img_url, image_url, photo',
-				placeholder: 'imageUrl',
-			},
-			{
-				displayName: 'Audio Field',
-				name: 'audioField',
-				type: 'string',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
-				},
-				default: 'audioUrl',
-				description:
-					'Field name for audio URL. Also checks: audio_url, voice, voice_url, clip',
-				placeholder: 'audioUrl',
-			},
-			{
-				displayName: 'Text / Caption Field',
-				name: 'textField',
-				type: 'string',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
-				},
-				default: 'voiceOver',
-				description:
-					'Field name for text overlay. Also checks: voice_over, Voiceover_Text, text, caption, title',
-				placeholder: 'voiceOver',
-			},
-			{
-				displayName: 'Duration Field',
-				name: 'durationField',
-				type: 'string',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
-				},
-				default: 'duration',
-				description:
-					'Field name for scene duration in seconds. Also checks: length, video_length, time',
-				placeholder: 'duration',
-			},
-			{
-				displayName: 'Default Duration (seconds)',
-				name: 'defaultDuration',
-				type: 'number',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner'] },
-				},
-				default: 5,
-				typeOptions: { minValue: 1, maxValue: 60 },
-				description: 'Used when no duration field is found on an item',
 			},
 			{
 				displayName: 'Resolution',
 				name: 'combinerResolution',
 				type: 'options',
 				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner', 'batchRender'] },
+					show: { operation: ['render'], inputSource: ['batchRender'] },
 				},
 				options: [
 					{ name: 'Preview (512×288)', value: 'preview' },
@@ -447,62 +160,24 @@ export class RemotionRender implements INodeType {
 				name: 'combinerFps',
 				type: 'number',
 				displayOptions: {
-					show: { operation: ['render'], inputSource: ['sequenceCombiner', 'batchRender'] },
+					show: { operation: ['render'], inputSource: ['batchRender'] },
 				},
 				default: 30,
 				typeOptions: { minValue: 1, maxValue: 60 },
 				description: 'Frames per second',
 			},
 
-			// ---- Batch Render note ----
+			// ---- Batch Render Defaults — image & text overrides ----
 			{
-				displayName:
-					'Each upstream item = one scene. Scenes are rendered INDIVIDUALLY via Remotion, then' +
-					' concatenated with <strong>ffmpeg</strong> into one final video.\n\n' +
-					'<strong>Each upstream item should look like:</strong>\n' +
-					'<code>{"imageUrl": "...", "audioUrl": "...", "caption": "...", "duration": 5}</code>\n\n' +
-					'<strong>Advantages:</strong>\n' +
-					'• Each scene gets its own Ken Burns zoom + TikTok captions + audio\n' +
-					'• No timeline complexity or overlapping issues\n' +
-					'• ffmpeg concat is instant (no re-encoding)\n\n' +
-					'<strong>Requirements:</strong>\n' +
-					'• n8n container must have ffmpeg installed (see n8n/Dockerfile)\n' +
-					'• Scenes render sequentially (one-at-a-time), so total time = sum of each render time\n' +
-					'• The final video is uploaded to the file-upload server and returned as a single URL',
-				name: 'batchRenderNote',
-				type: 'notice',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['batchRender'] },
-				},
-				default: '',
-			},
-
-			// ---- Auto Collect note ----
-			{
-				displayName:
-					'All items from the previous node are collected automatically. The node detects each item by:\n\n' +
-					'• <strong>Explicit "type" field</strong>: set type to "image", "audio", "text", or "soundtrack"\n' +
-					'• <strong>File extension</strong>: .jpg/.png/.webp → image, .mp3/.wav/.ogg → audio\n' +
-					'• <strong>Key names</strong>: url/src + image key → image, soundtrack/bgm key → soundtrack\n' +
-					'• <strong>text/caption</strong> key → text overlay\n' +
-					'• <strong>content_type/mime</strong> field\n\n' +
-					'<strong>Auto-timeline:</strong> Each image gets a default duration. Voice-over audios align with images by index. Adjust defaults below.',
-				name: 'autoCollectNote',
-				type: 'notice',
-				displayOptions: {
-					show: { operation: ['render'], inputSource: ['autoCollect'] },
-				},
-				default: '',
-			},
-
-			// ---- Auto Collect defaults ----
-			{
-				displayName: 'Auto Collect Defaults',
-				name: 'autoCollectDefaults',
+				displayName: 'Batch Render Defaults',
+				name: 'batchRenderDefaults',
 				placeholder: 'Defaults',
 				type: 'fixedCollection',
+				typeOptions: {
+					collapsible: true,
+				},
 				displayOptions: {
-					show: { operation: ['render'], inputSource: ['autoCollect'] },
+					show: { operation: ['render'], inputSource: ['batchRender'] },
 				},
 				default: {},
 				options: [
@@ -510,65 +185,140 @@ export class RemotionRender implements INodeType {
 						name: 'defaults',
 						displayName: 'Defaults',
 						values: [
-							{
-								displayName: 'Image Duration (seconds)',
-								name: 'imageDuration',
-								type: 'number',
-								default: 4,
-								typeOptions: { minValue: 1, maxValue: 60 },
-								description: 'How long each auto-detected image stays on screen',
-							},
+							// ===== Image defaults =====
 							{
 								displayName: 'Image Effect',
 								name: 'imageEffect',
 								type: 'options',
 								options: [
 									{ name: 'None', value: '' },
-									{ name: 'Fade', value: 'fade', description: 'Fade in / fade out' },
 									{ name: 'Zoom In', value: 'zoomIn' },
 									{ name: 'Zoom Out', value: 'zoomOut' },
+									{ name: 'Zoom In Fast', value: 'zoomInFast' },
+									{ name: 'Zoom Out Fast', value: 'zoomOutFast' },
 									{ name: 'Slide Left', value: 'slideLeft' },
 									{ name: 'Slide Right', value: 'slideRight' },
 									{ name: 'Slide Up', value: 'slideUp' },
 									{ name: 'Slide Down', value: 'slideDown' },
 								],
-								default: 'fade',
-								description: 'Default animation effect for auto-detected images',
+								default: 'zoomIn',
+								description:
+									'Ken Burns effect. Items can override with their own "effect" field.',
 							},
 							{
 								displayName: 'Image Fit',
 								name: 'imageFit',
 								type: 'options',
 								options: [
-									{ name: 'Contain (fit inside)', value: 'contain' },
 									{ name: 'Cover (fill & crop)', value: 'cover' },
+									{ name: 'Contain (fit inside)', value: 'contain' },
 									{ name: 'Fill (stretch)', value: 'fill' },
 								],
-								default: 'contain',
-								description: 'How images fit the frame',
+								default: 'cover',
+								description:
+									'How the image fits the frame. Items can override with "fit" field.',
 							},
 							{
-								displayName: 'Audio Align Mode',
-								name: 'audioAlign',
+								displayName: 'Image Fade In',
+								name: 'imageFadeIn',
+								type: 'boolean',
+								default: false,
+								description:
+									'Fade in at scene start. Items can override with "fadeIn" field.',
+							},
+							{
+								displayName: 'Image Fade Out',
+								name: 'imageFadeOut',
+								type: 'boolean',
+								default: false,
+								description:
+									'Fade out at scene end. Items can override with "fadeOut" field.',
+							},
+
+							// ===== Text defaults =====
+							{
+								displayName: 'Font Family',
+								name: 'fontFamily',
+								type: 'string',
+								default: 'Inter',
+								description:
+									'CSS font family. Items can override with "fontFamily" field.',
+								placeholder: 'Inter',
+							},
+							{
+								displayName: 'Font Size',
+								name: 'fontSize',
+								type: 'number',
+								default: 36,
+								typeOptions: { minValue: 12, maxValue: 200 },
+								description:
+									'Font size in pixels. Items can override with "fontSize" field.',
+							},
+							{
+								displayName: 'Font Color',
+								name: 'fontColor',
+								type: 'color',
+								default: '#FFFFFF',
+								description:
+									'Text color. Items can override with "fontColor" field.',
+							},
+							{
+								displayName: 'Font Weight',
+								name: 'fontWeight',
+								type: 'number',
+								default: 400,
+								typeOptions: { minValue: 100, maxValue: 900 },
+								description:
+									'Font weight (400=normal, 700=bold). Items can override with "fontWeight" field.',
+							},
+							{
+								displayName: 'Background Color',
+								name: 'background',
+								type: 'string',
+								default: 'rgba(0,0,0,0.3)',
+								placeholder: 'rgba(0,0,0,0.3)',
+								description:
+									'Background behind text (CSS color). Items can override with "background" field.',
+							},
+							{
+								displayName: 'Caption Style',
+								name: 'captionStyle',
 								type: 'options',
 								options: [
-									{
-										name: 'By Index — align with images',
-										value: 'index',
-										description: 'First audio plays with first image, second with second, etc.',
-									},
-									{
-										name: 'All at Start — play simultaneously',
-										value: 'allStart',
-										description: 'All audio clips start at frame 0 (for simultaneous playback)',
-									},
+									{ name: 'Static', value: 'static', description: 'Normal text overlay' },
+									{ name: 'TikTok Style', value: 'tiktok', description: 'Word-by-word highlighting' },
 								],
-								default: 'index',
-								description: 'How auto-detected audio clips are positioned in the timeline',
+								default: 'tiktok',
+								description:
+									'How captions are rendered. Items can override with "captionStyle" field.',
 							},
 							{
-								displayName: 'Text Vertical',
-								name: 'textVertical',
+								displayName: 'Word Timing (ms)',
+								name: 'combineMs',
+								type: 'number',
+								default: 400,
+								typeOptions: { minValue: 100, maxValue: 3000 },
+								description:
+									'Milliseconds per word (TikTok style only). Items can override with "combineMs" field.',
+							},
+							{
+								displayName: 'Text Animation',
+								name: 'textAnimation',
+								type: 'options',
+								options: [
+									{ name: 'None', value: 'none' },
+									{ name: 'Fade In', value: 'fadeIn' },
+									{ name: 'Slide Up', value: 'slideUp' },
+									{ name: 'Scale In', value: 'scale' },
+									{ name: 'Typewriter', value: 'typewriter' },
+								],
+								default: 'none',
+								description:
+									'Text entrance animation. Items can override with "textAnimation" field.',
+							},
+							{
+								displayName: 'Vertical Position',
+								name: 'vertical',
 								type: 'options',
 								options: [
 									{ name: 'Top', value: 'top' },
@@ -576,58 +326,26 @@ export class RemotionRender implements INodeType {
 									{ name: 'Bottom', value: 'bottom' },
 								],
 								default: 'bottom',
-								description: 'Default vertical position for auto-detected text overlays',
+								description:
+									'Vertical alignment. Items can override with "vertical" field.',
 							},
 							{
-								displayName: 'Text Font Size',
-								name: 'textFontSize',
-								type: 'number',
-								default: 40,
-								typeOptions: { minValue: 12, maxValue: 200 },
-								description: 'Default font size for auto-detected text overlays',
-							},
-							{
-								displayName: 'Text Font Color',
-								name: 'textFontColor',
-								type: 'color',
-								default: '#FFFFFF',
-								description: 'Default text color',
-							},
-							{
-								displayName: 'Soundtrack Volume',
-								name: 'soundtrackVolume',
-								type: 'number',
-								default: 0.15,
-								typeOptions: { minValue: 0, maxValue: 1, numberPrecision: 2 },
-								description: 'Default volume for auto-detected soundtrack',
-							},
-							{
-								displayName: 'Resolution',
-								name: 'resolution',
+								displayName: 'Horizontal Position',
+								name: 'horizontal',
 								type: 'options',
 								options: [
-									{ name: 'Preview (512×288)', value: 'preview' },
-									{ name: 'Mobile (640×360)', value: 'mobile' },
-									{ name: 'SD (1024×576)', value: 'sd' },
-									{ name: 'HD (1280×720)', value: 'hd' },
-									{ name: 'Full HD (1920×1080)', value: '1080' },
-									{ name: 'Vertical / Reels (1080×1920)', value: 'vertical' },
-									{ name: '4K (3840×2160)', value: '4k' },
+									{ name: 'Left', value: 'left' },
+									{ name: 'Center', value: 'center' },
+									{ name: 'Right', value: 'right' },
 								],
-								default: '1080',
-								description: 'Video resolution preset',
-							},
-							{
-								displayName: 'FPS',
-								name: 'fps',
-								type: 'number',
-								default: 25,
-								typeOptions: { minValue: 1, maxValue: 60 },
-								description: 'Frames per second',
+								default: 'center',
+								description:
+									'Horizontal alignment. Items can override with "horizontal" field.',
 							},
 						],
 					},
 				],
+				description: 'Default image and text settings for Batch Render. Each scene item can override these via matching field names.',
 			},
 
 			// ================================================================
@@ -1034,171 +752,28 @@ export class RemotionRender implements INodeType {
 		}
 
 		// ---- RENDER VIDEO ----
-		// We process items in bulk for autoCollect (single render from all items)
-		// or per-item for manual/inputJson
 		const inputSource = this.getNodeParameter('inputSource', 0, 'manual') as string;
-
-		if (inputSource === 'sequenceCombiner') {
-			// ----------------------------------------------------------------
-			// SEQUENCE COMBINER — each item = one scene, combine into one video
-			// ----------------------------------------------------------------
-			try {
-				const imageField = this.getNodeParameter('imageField', 0, 'imageUrl') as string;
-				const audioField = this.getNodeParameter('audioField', 0, 'audioUrl') as string;
-				const textField = this.getNodeParameter('textField', 0, 'voiceOver') as string;
-				const durationField = this.getNodeParameter('durationField', 0, 'duration') as string;
-				const defaultDuration = this.getNodeParameter('defaultDuration', 0, 5) as number;
-				const resolution = this.getNodeParameter('combinerResolution', 0, 'vertical') as string;
-				const fps = this.getNodeParameter('combinerFps', 0, 30) as number;
-
-				// Fallback field names to check when the configured field is empty
-				const imageFallbacks = ['imageUrl', 'url', 'src', 'img_url', 'image_url', 'photo'];
-				const audioFallbacks = ['audioUrl', 'audio_url', 'voice', 'voice_url', 'clip'];
-				const textFallbacks = ['voiceOver', 'voice_over', 'Voiceover_Text', 'text', 'caption', 'title'];
-				const durationFallbacks = ['duration', 'length', 'video_length', 'time'];
-
-				function getField(item: IDataObject, field: string, fallbacks: string[], defaultVal: any): any {
-					const keys = [field, ...fallbacks.filter(f => f !== field)];
-					for (const k of keys) {
-						const val = item[k];
-						if (val !== undefined && val !== null && val !== '') return val;
-					}
-					return defaultVal;
-				}
-
-				let currentStart = 0;
-				const images: IDataObject[] = [];
-				const audios: IDataObject[] = [];
-				const texts: IDataObject[] = [];
-
-				for (let i = 0; i < items.length; i++) {
-					const item = items[i]?.json as IDataObject;
-
-					const imageUrl = getField(item, imageField, imageFallbacks, '');
-					const audioUrl = getField(item, audioField, audioFallbacks, '');
-					const textVal = getField(item, textField, textFallbacks, '');
-					const duration = Number(getField(item, durationField, durationFallbacks, defaultDuration)) || defaultDuration;
-
-					if (imageUrl) {
-						images.push({ src: String(imageUrl), start: currentStart, length: duration });
-					}
-					if (audioUrl) {
-						audios.push({ src: String(audioUrl), start: currentStart, length: duration });
-					}
-					if (textVal) {
-						texts.push({
-							text: String(textVal),
-							start: currentStart,
-							length: duration,
-							vertical: 'bottom',
-							fontSize: 36,
-							fontColor: '#FFFFFF',
-						});
-					}
-
-					currentStart += duration;
-				}
-
-				// Build timeline
-				const allClips = [...images, ...texts, ...audios];
-				const totalDuration = allClips.reduce((max, c) => {
-					return Math.max(max, (Number(c.start) || 0) + (Number(c.length) || 5));
-				}, 0) || 5;
-
-				const tracks: IDataObject[] = [];
-
-				if (images.length) {
-					tracks.push({
-						clips: images.map((img) => ({
-							asset: { type: 'image', src: img.src },
-							start: Number(img.start) || 0,
-							length: Number(img.length) || totalDuration,
-							fit: (img.fit as string) || 'cover',
-							effect: (img.effect as string) || 'zoomIn',
-						})),
-					});
-				}
-
-				if (texts.length) {
-					tracks.push({
-						clips: texts.map((txt) => ({
-							asset: {
-								type: 'text',
-								text: txt.text || '',
-								font: { family: 'Inter', size: 36, color: '#FFFFFF', weight: 400 },
-								alignment: { horizontal: 'center', vertical: 'bottom' },
-								background: 'rgba(0,0,0,0.3)',
-								captionStyle: (txt.captionStyle as string) || 'tiktok',
-								combineMs: Number(txt.combineMs) || 400,
-							},
-							start: Number(txt.start) || 0,
-							length: Number(txt.length) || totalDuration,
-						})),
-					});
-				}
-
-				if (audios.length) {
-					tracks.push({
-						clips: audios.map((a) => ({
-							asset: { type: 'audio', src: a.src },
-							start: Number(a.start) || 0,
-							length: Number(a.length) || totalDuration,
-						})),
-					});
-				}
-
-				const timeline: IDataObject = { tracks };
-				const payload = { timeline, output: { format: 'mp4', resolution, fps } };
-
-				const renderResponse = (await remotionApiRequest.call(
-					this,
-					'POST',
-					'/edit/v1/render',
-					payload as unknown as IDataObject,
-				)) as IDataObject;
-
-				if (!renderResponse?.success) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Render API rejected: ${JSON.stringify(renderResponse)}`,
-					);
-				}
-
-				const responseData = renderResponse.response as IDataObject;
-				const renderId = responseData?.id as string;
-
-				if (!renderId) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`No render ID returned: ${JSON.stringify(renderResponse)}`,
-					);
-				}
-
-				const pollResult = await pollRender.call(this, renderId, baseUrl);
-				returnData.push({ json: pollResult as IDataObject });
-			} catch (error: any) {
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: {
-							error: error.message,
-							errorDetails: error.description || '',
-						},
-					});
-				} else {
-					throw error;
-				}
-			}
-
-			return [returnData];
-		}
 
 		if (inputSource === 'batchRender') {
 			// ----------------------------------------------------------------
-			// BATCH RENDER — render each scene individually, concat with ffmpeg
+			// BATCH RENDER — render each scene individually, concat with ffmpeg,
+			// return final video as binary data (NO internal upload)
+			// Supports per-item overrides from scene JSON fields.
 			// ----------------------------------------------------------------
 			try {
 				const resolution = this.getNodeParameter('combinerResolution', 0, 'vertical') as string;
 				const fps = this.getNodeParameter('combinerFps', 0, 30) as number;
+
+				// Read batch render UI defaults
+				const defaultsParam = this.getNodeParameter('batchRenderDefaults', 0, {}) as IDataObject;
+				const rawDefaults = (defaultsParam.defaults as any);
+				// n8n 2.x stores fixedCollection as object, legacy as array
+				let d: IDataObject = {};
+				if (Array.isArray(rawDefaults)) {
+					d = rawDefaults.length > 0 ? (rawDefaults[0] as IDataObject) : {};
+				} else if (typeof rawDefaults === 'object' && rawDefaults !== null) {
+					d = rawDefaults as IDataObject;
+				}
 
 				const tempDir = '/tmp/remotion-batch-' + Date.now();
 				fs.mkdirSync(tempDir, { recursive: true });
@@ -1214,37 +789,64 @@ export class RemotionRender implements INodeType {
 						const duration = Number(scene.duration) || 5;
 						const sceneNum = scene.scene_number || (i + 1);
 
+						// Per-item image overrides (scene field > UI default > hardcoded fallback)
+						const effect = getVal(scene, ['effect', 'imageEffect'], d.imageEffect) || 'zoomIn';
+						const fit = getVal(scene, ['fit', 'imageFit'], d.imageFit) || 'cover';
+						const fadeIn = !!getVal(scene, ['fadeIn', 'imageFadeIn'], d.imageFadeIn);
+						const fadeOut = !!getVal(scene, ['fadeOut', 'imageFadeOut'], d.imageFadeOut);
+
+						// Per-item text overrides
+						const fontFamily = getVal(scene, ['fontFamily'], d.fontFamily) || 'Inter';
+						const fontSize = Number(getVal(scene, ['fontSize'], d.fontSize)) || 36;
+						const fontColor = getVal(scene, ['fontColor'], d.fontColor) || '#FFFFFF';
+						const fontWeight = Number(getVal(scene, ['fontWeight'], d.fontWeight)) || 400;
+						const background = getVal(scene, ['background'], d.background) || 'rgba(0,0,0,0.3)';
+						const captionStyle = getVal(scene, ['captionStyle'], d.captionStyle) || 'tiktok';
+						const combineMs = Number(getVal(scene, ['combineMs'], d.combineMs)) || 400;
+						const textAnimation = getVal(scene, ['textAnimation'], d.textAnimation) || 'none';
+						const vertical = getVal(scene, ['vertical'], d.vertical) || 'bottom';
+						const horizontal = getVal(scene, ['horizontal'], d.horizontal) || 'center';
+
 						// Build single-scene Remotion payload
 						const tracks: IDataObject[] = [];
 
 						if (imageUrl) {
-							tracks.push({
-								clips: [{
-									asset: { type: 'image', src: imageUrl },
-									start: 0,
-									length: duration,
-									fit: 'cover',
-									effect: 'zoomIn',
-								}],
-							});
+							const imageClip: IDataObject = {
+								asset: { type: 'image', src: imageUrl },
+								start: 0,
+								length: duration,
+								fit,
+								effect,
+							};
+							if (fadeIn || fadeOut) {
+								imageClip.transition = {};
+								if (fadeIn) (imageClip.transition as IDataObject).in = 'fade';
+								if (fadeOut) (imageClip.transition as IDataObject).out = 'fade';
+							}
+							tracks.push({ clips: [imageClip] });
 						}
 
 						if (caption) {
-							tracks.push({
-								clips: [{
-									asset: {
-										type: 'text',
-										text: caption,
-										font: { family: 'Inter', size: 36, color: '#FFFFFF', weight: 400 },
-										alignment: { horizontal: 'center', vertical: 'bottom' },
-										background: 'rgba(0,0,0,0.3)',
-										captionStyle: 'tiktok',
-										combineMs: 400,
-									},
-									start: 0,
-									length: duration,
-								}],
-							});
+							const textAsset: IDataObject = {
+								type: 'text',
+								text: caption,
+								font: { family: fontFamily, size: fontSize, color: fontColor, weight: fontWeight },
+								alignment: { horizontal, vertical },
+								background,
+							};
+							if (captionStyle === 'tiktok') {
+								textAsset.captionStyle = 'tiktok';
+								textAsset.combineMs = combineMs;
+							}
+							const textClip: IDataObject = {
+								asset: textAsset,
+								start: 0,
+								length: duration,
+							};
+							if (textAnimation && textAnimation !== 'none') {
+								textClip.textAnimation = textAnimation;
+							}
+							tracks.push({ clips: [textClip] });
 						}
 
 						if (audioUrl) {
@@ -1288,8 +890,14 @@ export class RemotionRender implements INodeType {
 							throw new NodeOperationError(this.getNode(), `No video URL for scene ${sceneNum}`);
 						}
 
-						// Download the scene video
-						const videoBuffer = await remotionApiRequest.call(this, 'GET', videoUrl);
+						// Download the scene video (full URL, avoid remotionApiRequest URL doubling)
+						const downloadRes = await this.helpers.request({
+							method: 'GET',
+							url: videoUrl,
+							json: false,
+							encoding: null,
+						});
+						const videoBuffer = downloadRes;
 						const safeName = `scene_${String(sceneNum).padStart(3, '0')}.mp4`;
 						const outPath = path.join(tempDir, safeName);
 						fs.writeFileSync(outPath, Buffer.from(videoBuffer as any));
@@ -1318,38 +926,23 @@ export class RemotionRender implements INodeType {
 						);
 					}
 
-					// Upload final video to file-upload server
+					// Read final video and return as binary data (NO internal upload)
 					const finalBuf = fs.readFileSync(finalPath);
 					const finalName = `batch_${Date.now()}.mp4`;
-
-					const uploadRes = await this.helpers.request({
-						method: 'POST',
-						url: 'http://file-upload:8001/upload',
-						headers: {
-							'Content-Type': 'multipart/form-data',
-						},
-						formData: {
-							file: {
-								value: finalBuf as any,
-								options: {
-									filename: finalName,
-									contentType: 'video/mp4',
-								},
-							},
-						},
-					});
-
-					const uploadData = typeof uploadRes === 'string'
-						? JSON.parse(uploadRes)
-						: uploadRes;
 
 					returnData.push({
 						json: {
 							status: 'done',
 							scenesProcessed: items.length,
-							videoUrl: uploadData.url,
-							downloadUrl: uploadData.url,
+							fileName: finalName,
 						} as IDataObject,
+						binary: {
+							data: {
+								mimeType: 'video/mp4',
+								data: finalBuf.toString('base64'),
+								fileName: finalName,
+							},
+						},
 					});
 				} finally {
 					// Cleanup temp files
@@ -1375,455 +968,7 @@ export class RemotionRender implements INodeType {
 			return [returnData];
 		}
 
-		if (inputSource === 'autoCollect') {
-			// ----------------------------------------------------------------
-			// AUTO COLLECT MODE — single render from all upstream items
-			// ----------------------------------------------------------------
-			try {
-				const defaultsParam = this.getNodeParameter('autoCollectDefaults', 0, {}) as IDataObject;
-				const defaultsArr = (defaultsParam.defaults as IDataObject[]) || [];
-				const d = defaultsArr.length > 0 ? defaultsArr[0] : {};
-
-				const imageDuration = Number(d.imageDuration) || 4; // seconds
-				const imageEffect = (d.imageEffect as string) || 'fade';
-				const imageFit = (d.imageFit as string) || 'contain';
-				const audioAlign = (d.audioAlign as string) || 'index';
-				const textVertical = (d.textVertical as string) || 'bottom';
-				const textFontSize = Number(d.textFontSize) || 40;
-				const textFontColor = (d.textFontColor as string) || '#FFFFFF';
-				const soundtrackVolume = Number(d.soundtrackVolume) || 0.15;
-				const resolution = (d.resolution as string) || '1080';
-				const fps = Number(d.fps) || 25;
-
-				// Check if upstream already had a structured payload (detect top-level arrays)
-				const firstItem = items[0]?.json as IDataObject;
-				const hasStructuredPayload =
-					Array.isArray(firstItem?.images) ||
-					Array.isArray(firstItem?.texts) ||
-					Array.isArray(firstItem?.audios) ||
-					typeof firstItem?.soundtrack === 'object';
-
-				let images: IDataObject[] = [];
-				let texts: IDataObject[] = [];
-				let audios: IDataObject[] = [];
-				let soundtrack: IDataObject | null = null;
-
-				if (hasStructuredPayload) {
-					// Fallback to inputJson behavior (upstream sent structured array)
-					if (Array.isArray(firstItem.images)) images = firstItem.images as IDataObject[];
-					if (Array.isArray(firstItem.texts)) texts = firstItem.texts as IDataObject[];
-					if (Array.isArray(firstItem.audios)) audios = firstItem.audios as IDataObject[];
-					if (typeof firstItem.soundtrack === 'object' && firstItem.soundtrack !== null) {
-						soundtrack = firstItem.soundtrack as IDataObject;
-					}
-				} else {
-					// AUTO-DETECT: classify every item, build timeline
-					const detectedImages: DetectedAsset[] = [];
-					const detectedAudios: DetectedAsset[] = [];
-					const detectedTexts: DetectedAsset[] = [];
-					let detectedSoundtrack: DetectedAsset | null = null;
-
-					for (const item of items) {
-						const assets = classifyItem(item.json as IDataObject);
-						for (const asset of assets) {
-							if (asset.type === 'image') detectedImages.push(asset);
-							else if (asset.type === 'soundtrack') detectedSoundtrack = asset;
-							else if (asset.type === 'audio') detectedAudios.push(asset);
-							else if (asset.type === 'text') detectedTexts.push(asset);
-						}
-					}
-
-					if (detectedImages.length === 0 && detectedAudios.length === 0 && detectedTexts.length === 0 && !detectedSoundtrack) {
-						// Nothing detected — show a helpful error
-						const sampleKeys = items.length > 0
-							? Object.keys(items[0].json).slice(0, 6).join(', ')
-							: '(no items)';
-						throw new NodeOperationError(
-							this.getNode(),
-							`Auto Collect couldn't detect any images, audios, or text in the incoming data. ` +
-							`First item keys: ${sampleKeys}. ` +
-							`Either use "Manual" or "From Input JSON" mode, or ensure upstream data has ` +
-							`recognizable keys (url, src, text, caption) or file extensions (.jpg, .png, .mp3).`,
-						);
-					}
-
-					// Convert detection results to timeline items
-					// Images: sequential with auto-timing
-					const frameDuration = imageDuration * fps;
-					images = detectedImages.map((img, i) => ({
-						src: img.src,
-						start: i * frameDuration / fps, // in seconds
-						length: imageDuration,
-						effect: imageEffect || undefined,
-						fit: imageFit,
-						// Pass through metadata from upstream
-						...(img.meta.transition ? { transition: img.meta.transition } : {}),
-						...(img.meta.fadeIn ? { fadeIn: true } : {}),
-						...(img.meta.fadeOut ? { fadeOut: true } : {}),
-					}));
-
-					// Audios: by index (align with images) or all at start
-					if (audioAlign === 'allStart') {
-						audios = detectedAudios.map((a) => ({
-							src: a.src,
-							start: 0,
-							length: imageDuration * Math.max(images.length, 1),
-						}));
-					} else {
-						audios = detectedAudios.map((a, i) => ({
-							src: a.src,
-							start: (i * frameDuration) / fps,
-							length: imageDuration,
-						}));
-					}
-
-					// Soundtrack
-					if (detectedSoundtrack) {
-						soundtrack = {
-							src: detectedSoundtrack.src,
-							volume: soundtrackVolume,
-						};
-					}
-
-					// Texts: align with images by index
-					texts = detectedTexts.map((t, i) => ({
-						text: t.text,
-						start: (i * frameDuration) / fps,
-						length: imageDuration,
-						vertical: textVertical,
-						horizontal: 'center',
-						fontSize: textFontSize,
-						fontColor: textFontColor,
-						fontFamily: 'Inter',
-					}));
-				}
-
-				// ----- Build the payload (same as before) -----
-				const allClips = [...images, ...texts, ...audios];
-				const totalDuration = allClips.reduce((max, c) => {
-					const start = Number(c.start) || 0;
-					const length = Number(c.length) || 5;
-					return Math.max(max, start + length);
-				}, 0) || 5;
-
-				const tracks: IDataObject[] = [];
-
-				if (images.length) {
-					tracks.push({
-						clips: images.map((img) => {
-							const clip: IDataObject = {
-								asset: { type: 'image', src: img.src },
-								start: Number(img.start) || 0,
-								length: Number(img.length) || totalDuration,
-								fit: (img.fit as string) || 'cover',
-							};
-							const effect = img.effect as string;
-							if (effect) clip.effect = effect;
-							const fadeIn = !!(img.fadeIn || (img.transition as IDataObject)?.in === 'fade');
-							const fadeOut = !!(img.fadeOut || (img.transition as IDataObject)?.out === 'fade');
-							if (fadeIn || fadeOut) {
-								clip.transition = {};
-								if (fadeIn) (clip.transition as IDataObject).in = 'fade';
-								if (fadeOut) (clip.transition as IDataObject).out = 'fade';
-							}
-							return clip;
-						}),
-					});
-				}
-
-				if (texts.length) {
-					tracks.push({
-						clips: texts.map((txt) => {
-							const asset: IDataObject = {
-								type: 'text',
-								text: txt.text || '',
-								font: {
-									family: (txt.fontFamily as string) || 'Inter',
-									size: Number(txt.fontSize) || 36,
-									color: (txt.fontColor as string) || '#FFFFFF',
-									weight: Number(txt.fontWeight) || 400,
-								},
-								alignment: {
-									horizontal: (txt.horizontal as string) || 'center',
-									vertical: (txt.vertical as string) || 'bottom',
-								},
-								background: (txt.background as string) || 'rgba(0,0,0,0.3)',
-							};
-							const capStyle = txt.captionStyle as string;
-							if (capStyle && capStyle !== 'static') {
-								asset.captionStyle = capStyle;
-							}
-							const combineMs = txt.combineMs as number;
-							if (combineMs) {
-								asset.combineMs = Number(combineMs);
-							}
-							const clip: IDataObject = {
-								asset,
-								start: Number(txt.start) || 0,
-								length: Number(txt.length) || totalDuration,
-							};
-							const anim = txt.textAnimation as string;
-							if (anim && anim !== 'none') {
-								clip.textAnimation = anim;
-							}
-							return clip;
-						}),
-					});
-				}
-
-				if (audios.length) {
-					tracks.push({
-						clips: audios.map((a) => ({
-							asset: { type: 'audio', src: a.src },
-							start: Number(a.start) || 0,
-							length: Number(a.length) || totalDuration,
-						})),
-					});
-				}
-
-				const timeline: IDataObject = { tracks };
-
-				if (soundtrack?.src) {
-					timeline.soundtrack = {
-						src: soundtrack.src,
-						volume: Number(soundtrack.volume) || 0.15,
-					};
-				}
-
-				const payload = {
-					timeline,
-					output: {
-						format: 'mp4',
-						resolution,
-						fps,
-					},
-				};
-
-				// POST render
-				const renderResponse = (await remotionApiRequest.call(
-					this,
-					'POST',
-					'/edit/v1/render',
-					payload as unknown as IDataObject,
-				)) as IDataObject;
-
-				if (!renderResponse?.success) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Render API rejected: ${JSON.stringify(renderResponse)}`,
-					);
-				}
-
-				const responseData = renderResponse.response as IDataObject;
-				const renderId = responseData?.id as string;
-
-				if (!renderId) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`No render ID returned: ${JSON.stringify(renderResponse)}`,
-					);
-				}
-
-				// Poll until done
-				const pollResult = await pollRender.call(this, renderId, baseUrl);
-
-				returnData.push({ json: pollResult as IDataObject });
-			} catch (error: any) {
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: {
-							error: error.message,
-							errorDetails: error.description || '',
-						},
-					});
-				} else {
-					throw error;
-				}
-			}
-
-			return [returnData];
-		}
-
-		// ---- MANUAL or INPUT JSON mode (per-item or combined) ----
-
-		// Check if combineItems mode is enabled (multi-scene from multiple upstream items)
-		const combineItems = inputSource === 'inputJson'
-			? this.getNodeParameter('combineItems', 0, false) as boolean
-			: false;
-
-		if (inputSource === 'inputJson' && combineItems && items.length > 1) {
-			// ----------------------------------------------------------------
-			// COMBINED MODE — multiple items → single video with sequential scenes
-			// ----------------------------------------------------------------
-			try {
-				const combinedImages: IDataObject[] = [];
-				const combinedTexts: IDataObject[] = [];
-				const combinedAudios: IDataObject[] = [];
-				let soundtrack: IDataObject | null = null;
-				let resolution = '1080';
-				let fps = 25;
-				let currentStart = 0;
-
-				for (let i = 0; i < items.length; i++) {
-					const item = items[i]?.json as IDataObject;
-
-					// First item may have structured arrays overrides
-					if (i === 0) {
-						if (Array.isArray(item.images)) {
-							// Upstream sent structured arrays → use them directly
-							combinedImages.push(...item.images as IDataObject[]);
-						}
-						if (Array.isArray(item.texts)) {
-							combinedTexts.push(...item.texts as IDataObject[]);
-						}
-						if (Array.isArray(item.audios)) {
-							combinedAudios.push(...item.audios as IDataObject[]);
-						}
-						if (typeof item.soundtrack === 'object') {
-							soundtrack = item.soundtrack as IDataObject;
-						}
-						if (item.resolution) resolution = String(item.resolution);
-						if (item.fps) fps = Number(item.fps);
-					}
-
-					// Treat each item as ONE scene
-					const imageUrl = String(item.imageUrl || item.url || item.img_url || '');
-					const audioUrl = String(item.audioUrl || item.audio_url || '');
-					const voiceOver = String(item.voiceOver || item.voice_over || item.Voiceover_Text || item.text || item.caption || '');
-					const duration = Number(item.duration || item.video_length || 5);
-
-					if (imageUrl) {
-						combinedImages.push({ src: imageUrl, start: currentStart, length: duration });
-					}
-					if (audioUrl) {
-						combinedAudios.push({ src: audioUrl, start: currentStart, length: duration });
-					}
-					if (voiceOver) {
-						combinedTexts.push({
-							text: voiceOver,
-							start: currentStart,
-							length: duration,
-							vertical: 'bottom',
-							fontSize: 36,
-							fontColor: '#FFFFFF',
-						});
-					}
-
-					currentStart += duration;
-				}
-
-				// Build and send ONE render with all scenes
-				const allClips = [...combinedImages, ...combinedTexts, ...combinedAudios];
-				const totalDuration = allClips.reduce((max, c) => {
-					const start = Number(c.start) || 0;
-					const len = Number(c.length) || 5;
-					return Math.max(max, start + len);
-				}, 0) || 5;
-
-				const tracks: IDataObject[] = [];
-
-				if (combinedImages.length) {
-					tracks.push({
-						clips: combinedImages.map((img) => ({
-							asset: { type: 'image', src: img.src },
-							start: Number(img.start) || 0,
-							length: Number(img.length) || totalDuration,
-							fit: (img.fit as string) || 'cover',
-							effect: (img.effect as string) || undefined,
-						})),
-					});
-				}
-
-				if (combinedTexts.length) {
-					tracks.push({
-						clips: combinedTexts.map((txt) => ({
-							asset: {
-								type: 'text',
-								text: txt.text || '',
-								font: {
-									family: (txt.fontFamily as string) || 'Inter',
-									size: Number(txt.fontSize) || 36,
-									color: (txt.fontColor as string) || '#FFFFFF',
-									weight: Number(txt.fontWeight) || 400,
-								},
-								alignment: {
-									horizontal: (txt.horizontal as string) || 'center',
-									vertical: (txt.vertical as string) || 'bottom',
-								},
-								background: (txt.background as string) || 'rgba(0,0,0,0.3)',
-							},
-							start: Number(txt.start) || 0,
-							length: Number(txt.length) || totalDuration,
-						})),
-					});
-				}
-
-				if (combinedAudios.length) {
-					tracks.push({
-						clips: combinedAudios.map((a) => ({
-							asset: { type: 'audio', src: a.src },
-							start: Number(a.start) || 0,
-							length: Number(a.length) || totalDuration,
-						})),
-					});
-				}
-
-				const timeline: IDataObject = { tracks };
-				if (soundtrack?.src) {
-					timeline.soundtrack = {
-						src: soundtrack.src,
-						volume: Number(soundtrack.volume) || 0.15,
-					};
-				}
-
-				const payload = {
-					timeline,
-					output: { format: 'mp4', resolution, fps },
-				};
-
-				const renderResponse = (await remotionApiRequest.call(
-					this,
-					'POST',
-					'/edit/v1/render',
-					payload as unknown as IDataObject,
-				)) as IDataObject;
-
-				if (!renderResponse?.success) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Render API rejected: ${JSON.stringify(renderResponse)}`,
-					);
-				}
-
-				const responseData = renderResponse.response as IDataObject;
-				const renderId = responseData?.id as string;
-
-				if (!renderId) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`No render ID returned: ${JSON.stringify(renderResponse)}`,
-					);
-				}
-
-				const pollResult = await pollRender.call(this, renderId, baseUrl);
-				returnData.push({ json: pollResult as IDataObject });
-			} catch (error: any) {
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: {
-							error: error.message,
-							errorDetails: error.description || '',
-						},
-					});
-				} else {
-					throw error;
-				}
-			}
-
-			return [returnData];
-		}
-
-		// ---- Original per-item processing (manual or non-combined inputJson) ----
+		// ---- MANUAL mode (per-item processing) ----
 		for (let i = 0; i < items.length; i++) {
 			try {
 				let images: IDataObject[] = [];
@@ -1833,51 +978,29 @@ export class RemotionRender implements INodeType {
 				let resolution = '1080';
 				let fps = 25;
 
-				if (inputSource === 'inputJson') {
-					// Read from upstream node output
-					const upstream = items[i]?.json as IDataObject;
-					if (upstream.images && Array.isArray(upstream.images)) {
-						images = upstream.images as IDataObject[];
-					}
-					if (upstream.texts && Array.isArray(upstream.texts)) {
-						texts = upstream.texts as IDataObject[];
-					}
-					if (upstream.audios && Array.isArray(upstream.audios)) {
-						audios = upstream.audios as IDataObject[];
-					}
-					if (upstream.soundtrack && typeof upstream.soundtrack === 'object') {
-						soundtrack = upstream.soundtrack as IDataObject;
-					}
-					if (upstream.soundtrackUrl && typeof upstream.soundtrackUrl === 'string') {
-						soundtrack = { src: upstream.soundtrackUrl, volume: 0.15 };
-					}
-					if (upstream.resolution) resolution = String(upstream.resolution);
-					if (upstream.fps) fps = Number(upstream.fps);
-				} else {
-					// Read from manual fields
-					const imagesParam = this.getNodeParameter('images', i, {}) as IDataObject;
-					const textsParam = this.getNodeParameter('texts', i, {}) as IDataObject;
-					const audiosParam = this.getNodeParameter('audios', i, {}) as IDataObject;
-					const soundtrackParam = this.getNodeParameter('soundtrack', i, {}) as IDataObject;
-					const outputSettings = this.getNodeParameter('outputSettings', i, {}) as IDataObject;
+				// Read from manual fields
+				const imagesParam = this.getNodeParameter('images', i, {}) as IDataObject;
+				const textsParam = this.getNodeParameter('texts', i, {}) as IDataObject;
+				const audiosParam = this.getNodeParameter('audios', i, {}) as IDataObject;
+				const soundtrackParam = this.getNodeParameter('soundtrack', i, {}) as IDataObject;
+				const outputSettings = this.getNodeParameter('outputSettings', i, {}) as IDataObject;
 
-					images = (imagesParam.image as IDataObject[]) || [];
-					texts = (textsParam.text as IDataObject[]) || [];
-					audios = (audiosParam.audio as IDataObject[]) || [];
+				images = (imagesParam.image as IDataObject[]) || [];
+				texts = (textsParam.text as IDataObject[]) || [];
+				audios = (audiosParam.audio as IDataObject[]) || [];
 
-					const trackArr = (soundtrackParam.track as IDataObject[]) || [];
-					if (trackArr.length > 0 && trackArr[0].src) {
-						soundtrack = {
-							src: trackArr[0].src,
-							volume: Number(trackArr[0].volume) || 0.15,
-						};
-					}
+				const trackArr = (soundtrackParam.track as IDataObject[]) || [];
+				if (trackArr.length > 0 && trackArr[0].src) {
+					soundtrack = {
+						src: trackArr[0].src,
+						volume: Number(trackArr[0].volume) || 0.15,
+					};
+				}
 
-					const settingsArr = (outputSettings.settings as IDataObject[]) || [];
-					if (settingsArr.length > 0) {
-						resolution = (settingsArr[0].resolution as string) || '1080';
-						fps = Number(settingsArr[0].fps) || 25;
-					}
+				const settingsArr = (outputSettings.settings as IDataObject[]) || [];
+				if (settingsArr.length > 0) {
+					resolution = (settingsArr[0].resolution as string) || '1080';
+					fps = Number(settingsArr[0].fps) || 25;
 				}
 
 				// Calculate total duration

@@ -10,14 +10,14 @@ An n8n community node for rendering videos using a self-hosted [Remotion](https:
 ## 🚀 Features
 
 - **📷 Multiple images** with Ken Burns effects (zoom, slide, pan)
-- **📝 Text overlays** — captions (bottom), titles (center/up), TikTok word-by-word style
-- **🎵 Multi-track audio** — scene-specific audio clips + background soundtrack
-- **🔄 3 input methods**:
-  - **Manual** — drag-and-drop fields in the node UI
-  - **From Input JSON** — pipe structured JSON from upstream nodes
-  - **Auto Collect** — **★ NEW** detects images/audios/texts automatically from any upstream node, no config needed
-- **⏳ Auto-poll** — node blocks until video is ready, returns download URL
+- **📝 Text overlays** — captions, titles, TikTok word-by-word style
+- **🎵 Multi-track audio** — scene-specific clips + background soundtrack
+- **🔄 2 input methods**:
+  - **Manual** — configure everything in the node UI
+  - **⚡ Batch Render** — each upstream item = one scene, renders individually, concats with ffmpeg, returns video as **binary data** (no internal upload — you control upload)
+- **⏳ Auto-poll** — blocks until video is ready
 - **🎬 Resolutions** — preview, mobile, SD, HD (1080p), vertical/Reels, 4K
+- **🎨 Configurable per-scene defaults** — image effects, fades, fonts, colors, caption style, text animation, alignment — with per-item overrides
 - **🌐 Any Remotion server** — local Docker, remote VPS, or cloud
 
 ---
@@ -53,510 +53,203 @@ docker compose up -d n8n
 
 ## 🔐 Credential Setup
 
-After installing the node, create a credential:
-
 1. **n8n → Credentials → Add New → Remotion Render API - mimnets**
-2. **Server URL**: `http://remotion:3000` (Docker network name)  
-   *or* `http://150.136.150.227:3000` (external IP)
-3. **API Key**: leave blank (your server doesn't require one)
+2. **Server URL**: `http://remotion:3000` (Docker internal) or your external IP
+3. **API Key**: leave blank
 4. **Save**
 
 ---
 
 ## 🎬 Usage
 
-### Input Method: Manual (drag-and-drop)
+### Input Method: Manual
 
-> **Node colors**: 🟣 **Remotion Render - mimnets** in the n8n editor
+1. **Operation → Render Video**, **Input Method → Manual**
+2. Add images, text overlays, audio clips, and soundtrack
+3. Set resolution and FPS
+4. Run — returns the rendered video URL
 
-1. Drag the **Remotion Render - mimnets** node into your workflow
-2. Select **Operation → Render Video**
-3. Choose **Input Method → Manual**
-4. Click **Add Image** — fill in URL, start time, length, effect
-5. Click **Add Text** — enter caption, set **Vertical Position → Bottom**
-6. Click **Add Audio** or fill in **Soundtrack** for background music
-7. Set **Resolution → 1080** (or whatever you need)
-8. Connect a trigger node before it (Manual, Webhook, Schedule, etc.)
-9. Run the workflow
-
-**Best for:** Testing, fixed content, predictable timelines.
+**Best for:** Testing, fixed-content videos, predictable timelines.
 
 ---
 
-### Input Method: From Input JSON (structured data)
+### Input Method: ⚡ Batch Render
 
-Use this when you want to pass data from an upstream Code node, LLM node, or HTTP request:
-
-1. **Input Method → From Input JSON**
-2. Connect the output of any node that returns this structure:
-
-```json
-{
-  "images": [
-    { "src": "https://example.com/photo1.jpg", "start": 0, "length": 10, "effect": "zoomIn" },
-    { "src": "https://example.com/photo2.jpg", "start": 10, "length": 10, "effect": "slideLeft" }
-  ],
-  "texts": [
-    { "text": "Welcome to my video!", "start": 0, "length": 5, "vertical": "bottom", "fontSize": 48 },
-    { "text": "Thanks for watching", "start": 15, "length": 5, "vertical": "bottom" }
-  ],
-  "audios": [
-    { "src": "https://example.com/narration-1.mp3", "start": 0, "length": 10 }
-  ],
-  "soundtrack": { "src": "https://example.com/background-music.mp3", "volume": 0.15 },
-  "resolution": "1080",
-  "fps": 25
-}
-```
-
-Example using an n8n Code node:
-
-```javascript
-// Code node — outputs pass to Remotion Render node
-const images = [
-  { src: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564", start: 0, length: 8, effect: "zoomIn" },
-  { src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4", start: 8, length: 8, effect: "slideRight" },
-];
-
-const texts = [
-  { text: "Amazing Nature", start: 0, length: 16, vertical: "bottom", fontSize: 48, fontColor: "#FFFFFF" },
-];
-
-return { images, texts, resolution: "1080", fps: 25 };
-```
-
-**Best for:** Power users, custom logic, AI-generated content, structured data pipelines.
-
----
-
-### Input Method: Auto Collect (★ NEW — recommended for most workflows)
-
-This is the easiest way to use the node. **No Code node needed.** Connect *any* upstream node that outputs image URLs, audio files, or text content — the node detects everything automatically.
-
-1. Select **Input Method → Auto Collect**
-2. Connect upstream nodes (image generators, file uploaders, AI text nodes, etc.)
-3. (Optional) Adjust defaults under **Auto Collect Defaults**
-4. Run
-
-#### How detection works
-
-The node scans every item from the previous node and classifies it:
-
-| Detection method | What's detected |
-|---|---|
-| **Explicit `type` field** | Set `type: "image"`, `type: "audio"`, `type: "text"`, or `type: "soundtrack"` |
-| **File extension** | `.jpg` / `.png` / `.webp` / `.gif` → image |
-| | `.mp3` / `.wav` / `.ogg` / `.m4a` → audio |
-| **Key name patterns** | `url` / `src` + image-like keys (`image`, `photo`, `thumbnail`) → image |
-| | `soundtrack` / `bgm` / `background_music` / `music` keys → soundtrack |
-| | `text` / `caption` / `title` / `headline` keys → text overlay |
-| **content_type / mime** | `image/png`, `audio/mpeg`, etc. |
-
-#### What gets auto-timelined
-
-- **Images** — placed sequentially, each gets the default duration (configurable, 4s default)
-- **Audio clips** — aligned with images by index, or all start at frame 0
-- **Text overlays** — placed alongside corresponding images
-- **Soundtrack** — plays throughout the entire video
-
-#### Example workflows
-
-**5 images from an image generator:**
-
-```
-[Image Generation Node] → outputs 5 items, each { url: "https://.../img.png" }
-        ↓
-[Remotion Render - Auto Collect]
-   → Detects 5 images
-   → Auto-timelines: each gets 4s = 20s video
-   → Renders and returns download URL
-```
-
-**Images + voice-overs from separate nodes:**
-
-```
-[Image Gen]  ──→ { url: "img1.png" }, { url: "img2.png" }
-                    ↓
-[Voice Gen]  ──→ { url: "voice1.mp3" }, { url: "voice2.mp3" }
-                    ↓
-[Merge Node (combine)]
-                    ↓
-[Remotion Render - Auto Collect]
-   → Detects: 2 images + 2 audio
-   → Aligns by index: img1+voice1 play together, img2+voice2 next
-   → Renders video with audio synced to visuals
-```
-
-**Mixed items (no extra nodes needed):**
-
-If your upstream outputs items with both `url: "img.jpg"` and `caption: "hello"`, the node extracts both and places them on the timeline together.
-
-#### Auto Collect defaults you can configure
-
-| Setting | Default | Description |
-|---|---|---|
-| Image Duration | 4s | Seconds each image stays on screen |
-| Image Effect | fade | Ken Burns effect: fade, zoomIn, slideLeft, etc. |
-| Image Fit | contain | Contain = show full image, Cover = fill & crop |
-| Audio Align Mode | by index | Index = align with images, All at start = simultaneous |
-| Text Position | bottom | Bottom, center, or top |
-| Text Font Size | 40 | Default caption size |
-| Text Font Color | #FFFFFF | White |
-| Soundtrack Volume | 0.15 | Quiet background (0–1) |
-| Resolution | 1080 | Full HD (1920×1080) |
-| FPS | 25 | Frames per second |
-
-**Best for:** Beginners, variable-content workflows, quick prototypes, AI pipelines where the number of items changes each run.
-
----
-
-### Input Method: ⭐ Sequence Combiner (★ NEW — from loops)
-
-Perfect when each upstream item is **one scene** and you want to combine them into a single video. Works seamlessly with `SplitInBatches` (loop) output.
-
-1. **Input Method → Sequence Combiner**
-2. Connect the output of a loop, Merge node, or any node that emits scene objects
-3. Map the fields — or leave defaults
-4. Remotion node automatically sequences scenes: Scene 1, Scene 2, Scene 3...
-
-#### How it works
-
-Each upstream item becomes one scene. Scenes are placed end-to-end:
-
-| Scene 1 (0–5s) | Scene 2 (5–12s) | Scene 3 (12–20s) |
-| imageUrl + audioUrl + caption | imageUrl + audioUrl + caption | imageUrl + audioUrl + caption |
-
-#### Field mapping
-
-| Node field | Default | What it maps to |
-|------------|---------|-----------------|
-| Image Field | `imageUrl` | URL of the scene image |
-| Audio Field | `audioUrl` | URL of the scene audio |
-| Text / Caption Field | `voiceOver` | Caption text overlay |
-| Duration Field | `duration` | Scene length in seconds |
-| Default Duration | 5 | Fallback when no duration field |
-
-#### What each upstream item should look like
-
-```json
-{
-  "imageUrl": "https://file.mimnets.com/files/scene1.png",
-  "audioUrl": "https://file.mimnets.com/files/scene1.mp3",
-  "caption": "This is the first scene caption",
-  "duration": 5,
-  "scene_number": 1
-}
-```
-
-#### New: Default image motion (v0.4.0+)
-
-Images now get **`zoomIn` Ken Burns effect by default**, so every scene has smooth camera motion without manual configuration. Set an `effect` field on your item to override:
-
-```json
-{
-  "imageUrl": "...",
-  "audioUrl": "...",
-  "effect": "slideRight"
-}
-```
-
-#### New: TikTok captions by default (v0.4.0+)
-
-Text/captions now default to **TikTok-style word-by-word highlighting** with gold color on each active word. This means captions automatically sync to the spoken audio — no extra config needed.
-
-You can still override to static mode by setting `captionStyle: "static"` on your item, or control word timing with `combineMs: 400` (faster = 400ms, sentence-level = 1200ms).
-
-#### Example workflow — Loop Over Items
-
-```
-[Trigger] → [Sheets] → [Code: parse scenes] → [SplitInBatches]
-    Each iteration → generate image + TTS audio + upload → { imageUrl, audioUrl, caption, duration }
-        ↓
-[Remotion Render - Sequence Combiner]
-   → Receives all scenes from loop
-   → Sequences end-to-end
-   → ONE video with all scenes
-```
-
-**No feedback loops. No wasted renders.** Each loop item = one scene. Remotion renders once at the end.
-
----
-
-### Input Method: ⚡ Batch Render (Render Each & Concat via ffmpeg)
-
-For workflows where Sequence Combiner has timeline issues (zoom/captions only on first scene), **Batch Render** mode renders each scene as its own separate video, then concatenates them with ffmpeg. No timeline complexity — each scene is a clean, independent render.
+Each upstream item = **one scene**. Scenes are rendered individually, then concatenated with ffmpeg. **Perfect for per-scene zoom + captions + audio** without timeline complexity.
 
 1. **Input Method → Batch Render**
-2. Connect any node that outputs scene objects
-3. Each upstream item = one scene — rendered individually, then concat'd
-
-#### How it works
-
-1. Receives all scene items at once
-2. For each scene: sends a single-scene payload to Remotion → polls → downloads the MP4
-3. After all scenes: runs `ffmpeg -f concat -c copy` to join them instantly
-4. Uploads the final combined video to your file-upload server
-5. Returns the download URL
-
-#### Requirements
-
-- **ffmpeg** must be installed in the n8n container. If using Docker, build from `n8n/Dockerfile`:
-  ```bash
-  docker compose up -d --build n8n
-  ```
-- Scenes render **sequentially** (one at a time), so total time = sum of all render durations
+2. Connect any upstream node that outputs scene objects
+3. Set Resolution and FPS
 
 #### What each upstream item should look like
 
 ```json
 {
-  "imageUrl": "https://file.mimnets.com/files/scene1.png",
-  "audioUrl": "https://file.mimnets.com/files/scene1.mp3",
+  "imageUrl": "https://.../scene1.png",
+  "audioUrl": "https://.../scene1.mp3",
   "caption": "First scene caption",
   "duration": 5,
   "scene_number": 1
 }
 ```
 
-#### Benefits over Sequence Combiner
+#### Output
 
-| Aspect | Sequence Combiner | Batch Render |
-|--------|-------------------|--------------|
-| **Zoom on every scene** | Can miss scenes | ✅ Every scene |
-| **TikTok captions** | Can miss scenes | ✅ Every scene |
-| **Audio overlapping** | Possible | ✅ Never (separate renders) |
-| **Render time** | One render | Multiple renders (N scenes × time) |
-| **ffmpeg required** | No | Yes |
-| **Final concat** | Built into Remotion | Instant (`-c copy`, no re-encode) |
-
-#### Example workflow — two loops + merge + batch render
+The node returns the final concatenated video as **binary data** — no internal file upload. After the node, connect your own upload/publish chain:
 
 ```
-[Image Loop] → upload → image URLs
-[Audio Loop] → TTS → upload → audio URLs
-[Merge by scene_number]
-   → [Code: build scenes with word-count duration]
-      → [Remotion Render - Batch Render]
-         → Renders each scene → concats → uploads → returns URL
+[Remotion Render (Batch)] → [Code Node] → [HTTP Request (upload)] → wherever
 ```
 
----
+The JSON output contains `{ status, scenesProcessed, fileName }` and the video is attached as `$binary.data`.
 
-### Output
+#### Per-item overrides
 
-The node returns:
+Each scene item can override the Batch Render Defaults via its own fields. **Precedence: item field → UI default → hardcoded fallback**
+
+| Field | Overrides | Example |
+|---|---|---|
+| `effect` | Image Effect | `"slideLeft"` |
+| `fit` | Image Fit | `"contain"` |
+| `fadeIn` | Image Fade In | `true` |
+| `fadeOut` | Image Fade Out | `true` |
+| `fontSize` | Font Size | `48` |
+| `fontColor` | Font Color | `"#FFD700"` |
+| `fontFamily` | Font Family | `"Arial"` |
+| `fontWeight` | Font Weight | `700` |
+| `background` | Background | `"rgba(0,0,0,0.5)"` |
+| `captionStyle` | Caption Style | `"static"` |
+| `combineMs` | Word Timing | `800` |
+| `textAnimation` | Text Animation | `"slideUp"` |
+| `vertical` | Vertical Position | `"top"` |
+| `horizontal` | Horizontal Position | `"left"` |
+
+Example with overrides:
 
 ```json
 {
-  "renderId": "abc123def456",
-  "status": "done",
-  "videoUrl": "http://remotion:3000/serve/v1/assets/abc123def456/output.mp4",
-  "downloadUrl": "http://remotion:3000/serve/v1/assets/abc123def456/output.mp4",
-  "pollsNeeded": 8
+  "imageUrl": "...",
+  "audioUrl": "...",
+  "caption": "Custom scene",
+  "duration": 5,
+  "effect": "slideRight",
+  "fontSize": 48,
+  "fontColor": "#FFD700",
+  "textAnimation": "fadeIn"
 }
 ```
 
-Pass `downloadUrl` into an HTTP Request node (GET, Response Format: File) to download the MP4, or use it directly as a source URL.
+#### Requirements
 
----
+- **ffmpeg** must be installed in the n8n container
+- Scenes render sequentially (one at a time)
 
-## 🧩 Full Workflow Examples
-
-### Example 1: AI images → video reel
-
-```
-[OpenClaw Image Generator]  → 5 social media images
-        ↓
-[Remotion Render - Auto Collect]  → detects images, builds reel
-        ↓
-[HTTP Request]  → download MP4
-        ↓
-[Telegram / Discord]  → publish
-```
-
-### Example 2: Structured data (Code node)
-
-```
-[Manual Trigger]
-        ↓
-[Code Node]  ← Build images[], texts[], audios[]
-        ↓
-[Remotion Render - From Input JSON]
-        ↓
-[HTTP Request]  → download file
-```
-
-### Example 3: Voice-over slideshow
-
-```
-[Image Upload Node]  → { url: "...", caption: "Slide 1" }
-                     → { url: "...", caption: "Slide 2" }
-        ↓
-[Remotion Render - Auto Collect]
-   → Detects: 2 images + 2 captions
-   → Timeline: img1 + "Slide 1" → img2 + "Slide 2"
-   → Renders video
-```
+**Best for:** AI pipelines, per-scene audio+caption sync, loops, variable-length scenes.
 
 ---
 
 ## 📋 Node Fields Reference
 
-### Image fields
+### Batch Render settings
 
-| Field | Type | Description |
+| Field | Default | Description |
 |---|---|---|
-| Image URL | string | Public URL of the image |
-| Start (seconds) | number | When the image appears |
-| Length (seconds) | number | How long it stays on screen |
-| Ken Burns Effect | select | `zoomIn`, `zoomOut`, `slideLeft`, `slideRight`, `slideUp`, `slideDown`, `zoomInFast`, `zoomOutFast`, or None |
-| Fade In | boolean | Fade in at start of clip |
-| Fade Out | boolean | Fade out at end of clip |
+| Resolution | `vertical` (1080×1920) | Preview, mobile, SD, HD, 1080, vertical, 4K |
+| FPS | 30 | Frames per second |
 
-### Text fields
+### Batch Render Defaults (collapsible in UI)
 
-| Field | Type | Description |
-|---|---|---|
-| Text | string | Caption or title content |
-| Start (seconds) | number | When text appears |
-| Length (seconds) | number | How long it stays |
-| **Vertical Position** | select | **`bottom`** for captions, `center` / `top` for titles |
-| Horizontal Position | select | `left`, `center`, `right` |
-| Font Family | string | CSS font name (must be in Remotion container) |
-| Font Size | number | px size (scales with resolution) |
-| Font Weight | number | 100–900 (400=normal, 700=bold) |
-| Font Color | color | Hex color picker |
-| Background Color | string | CSS color like `rgba(0,0,0,0.3)` |
+**Image defaults:**
+- Effect (default: `zoomIn`), Fit (`cover`), Fade In/Out (`false`)
 
-### Audio fields
+**Text defaults:**
+- Font: Family (`Inter`), Size (`36`), Color (`#FFFFFF`), Weight (`400`)
+- Background (`rgba(0,0,0,0.3)`)
+- Caption Style (`tiktok`), Word Timing (`400ms`)
+- Animation (`none`), Vertical (`bottom`), Horizontal (`center`)
 
-| Field | Type | Description |
-|---|---|---|
-| Audio URL | string | URL of audio file (mp3, wav, ogg) |
-| Start (seconds) | number | When audio starts |
-| Length (seconds) | number | How long it plays |
+### Image fields (Manual)
 
-### Soundtrack (background audio)
+| Field | Description |
+|---|---|
+| Image URL | Public URL of the image |
+| Start (seconds) | When the image appears |
+| Length (seconds) | How long it stays |
+| Ken Burns Effect | `zoomIn`, `zoomOut`, `slideLeft`, etc. |
+| Fade In / Fade Out | Toggle fades |
 
-| Field | Type | Description |
-|---|---|---|
-| Audio URL | string | Background music URL |
-| Volume | number | 0–1 (0.15 = quiet background, 1 = full volume) |
+### Text fields (Manual)
 
-### Output settings (Manual mode)
+| Field | Description |
+|---|---|
+| Text | Caption or title content |
+| Start / Length | Timing |
+| Vertical Position | `bottom` (captions), `center`, `top` |
+| Font | Family, Size, Weight, Color |
+| Background | CSS color behind text |
+| Caption Style | Static or TikTok word-by-word |
 
-| Field | Type | Description |
-|---|---|---|
-| Resolution | select | `preview` (512×288), `mobile` (640×360), `sd` (1024×576), `hd` (1280×720), **`1080`** (1920×1080), `vertical` (1080×1920), `4k` (3840×2160) |
-| FPS | number | 1–60 (25 recommended) |
+### Audio fields (Manual)
+
+| Field | Description |
+|---|---|
+| Audio URL | Public URL (mp3, wav, ogg) |
+| Start / Length | Timing |
+| Soundtrack | Background music with volume control |
 
 ---
 
-## 🔧 Remotion Server Configuration
+## 🔧 Remotion Server
 
-Your Remotion server at `http://remotion:3000` supports these endpoints:
+Your Remotion server at `http://remotion:3000` supports:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/edit/v1/render` | POST | Submit a render job (returns immediately with render ID) |
-| `/edit/v1/render/:id` | GET | Check render status — returns `"done"` when video is ready |
-| `/serve/v1/assets/:id/output.mp4` | GET | Download the rendered MP4 |
-| `/health` | GET | Server health check |
-| `/tools/api-builder` | GET | Visual JSON builder for the render payload |
+| `/edit/v1/render` | POST | Submit a render job |
+| `/edit/v1/render/:id` | GET | Check render status |
+| `/serve/v1/assets/:id/output.mp4` | GET | Download rendered MP4 |
+| `/health` | GET | Server health |
 
-### Available Ken Burns effects
-
-| Value | Effect |
-|---|---|
-| `zoomIn` | Slow zoom into the image |
-| `zoomOut` | Slow zoom out of the image |
-| `zoomInFast` | Faster zoom in |
-| `zoomOutFast` | Faster zoom out |
-| `slideLeft` | Pan image to the left |
-| `slideRight` | Pan image to the right |
-| `slideUp` | Pan image upward |
-| `slideDown` | Pan image downward |
-
-### Available resolutions
+### Resolutions
 
 | Value | Dimensions | Use case |
 |---|---|---|
-| `preview` | 512×288 | Quick previews, testing |
-| `mobile` | 640×360 | Phone-optimized, social media |
-| `sd` | 1024×576 | Standard definition |
-| `hd` | 1280×720 | YouTube, social platforms |
-| `1080` (default) | 1920×1080 | Full HD — best quality |
+| `preview` | 512×288 | Quick testing |
+| `mobile` | 640×360 | Phone-optimized |
+| `sd` | 1024×576 | Standard def |
+| `hd` | 1280×720 | YouTube |
+| `1080` | 1920×1080 | Full HD |
 | `vertical` | 1080×1920 | TikTok/Reels/Shorts |
-| `4k` | 3840×2160 | Ultra HD — longer render times |
-
-### Rebuilding the Remotion container
-
-If you modify the VideoComposition or server code:
-
-```bash
-cd /home/ubuntu/n8n-qdrant-starter
-docker compose build remotion
-docker compose up -d remotion
-```
+| `4k` | 3840×2160 | Ultra HD |
 
 ---
 
 ## 🚨 Troubleshooting
 
-### Auto Collect detects nothing
-
-The upstream data doesn't have recognizable fields. Common fixes:
-
-1. **Use explicit `type` field** — add `"type": "image"` or `"type": "audio"` to each item
-2. **Check your field names** — the node looks for `url`, `src`, `image`, `photo`, `caption`, `text`, `soundtrack`
-3. **Check file extensions** — `.png`, `.jpg`, `.mp3` are the most reliable signals
-4. **Still not working?** — Switch to **From Input JSON** mode and use a Code node to format the data
-
-### Text stays in center (not at bottom)
-
-The Remotion server uses `position: absolute; bottom: 80px` for `vertical: "bottom"`. Make sure:
-1. The Remotion container is rebuilt: `docker compose build remotion && docker compose up -d remotion`
-2. The node's **Vertical Position** is set to **Bottom**
-3. Check the server logs: `docker compose logs remotion`
-
 ### "Node does not have any credentials set"
 
-You need to create a credential first:
-1. n8n → **Credentials** → **Add New** → **Remotion Render API - mimnets**
-2. Set **Server URL** to `http://remotion:3000`
-3. Save
-4. In the node, select this credential from the dropdown
+Create a **Remotion Render API - mimnets** credential with Server URL `http://remotion:3000`.
+
+### ffmpeg concat fails (Batch Render)
+
+Ensure ffmpeg is installed in the n8n container. See your project's `n8n/Dockerfile`.
 
 ### Render fails or times out
 
-- Check the Remotion server is running: `curl http://remotion:3000/health`
-- Check server logs: `docker compose logs remotion`
-- Longer videos take more time — the node polls for up to 5 minutes
-- Ensure all image URLs and audio URLs are publicly accessible
-
-### Node icon shows broken image
-
-Update to the latest version: `n8n-nodes-remotion-render@0.3.0+` includes an SVG icon.
+- Check server: `curl http://remotion:3000/health`
+- Check logs: `docker compose logs remotion`
+- Ensure all image/audio URLs are publicly accessible
 
 ---
 
 ## 🏗 Development
 
 ```bash
-# Clone / navigate to the project
-cd n8n-qdrant-starter/n8n-nodes-remotion-render
-
-# Install dependencies
+cd n8n-nodes-remotion-render
 npm install
-
-# Build (TypeScript → dist/)
-npm run build
-
-# Watch mode (auto-compile on changes)
-npm run dev
-
-# Publish to npm
-npm version patch
+npm run build          # TypeScript → dist/
+npm run dev            # Watch mode
+npm version patch      # Bump version
 npm publish
 ```
 
@@ -564,6 +257,4 @@ npm publish
 
 ## 📄 License
 
-MIT — use it freely in personal, commercial, and open-source projects.
-
-Built for the [n8n-qdrant-starter](https://github.com/mimnets/n8n-qdrant-starter) — a self-hosted AI video automation stack.
+MIT — use it freely. Built for the [n8n-qdrant-starter](https://github.com/mimnets/n8n-qdrant-starter) — a self-hosted AI video automation stack.
