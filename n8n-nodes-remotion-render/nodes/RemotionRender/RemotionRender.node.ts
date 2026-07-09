@@ -235,6 +235,16 @@ export class RemotionRender implements INodeType {
 									'Fade out at scene end. Items can override with "fadeOut" field.',
 							},
 
+							// ===== Randomize toggle =====
+							{
+								displayName: '🎲 Randomize Image Effect per scene',
+								name: 'shuffleEnabled',
+								type: 'boolean',
+								default: false,
+								description:
+									'When enabled, each scene without an explicit "effect" field gets a random Ken Burns effect. Image Fit and Fades are not randomized. Manual per-item overrides still take precedence.',
+							},
+
 							// ===== Text defaults =====
 							{
 								displayName: 'Font Family',
@@ -789,11 +799,24 @@ export class RemotionRender implements INodeType {
 						const duration = Number(scene.duration) || 5;
 						const sceneNum = scene.scene_number || (i + 1);
 
-						// Per-item image overrides (scene field > UI default > hardcoded fallback)
-						const effect = getVal(scene, ['effect', 'imageEffect'], d.imageEffect) || 'zoomIn';
-						const fit = getVal(scene, ['fit', 'imageFit'], d.imageFit) || 'cover';
-						const fadeIn = !!getVal(scene, ['fadeIn', 'imageFadeIn'], d.imageFadeIn);
-						const fadeOut = !!getVal(scene, ['fadeOut', 'imageFadeOut'], d.imageFadeOut);
+						// Per-item image overrides (scene field > shuffle > UI default > hardcoded)
+						const sceneEffect = scene.effect || scene.imageEffect;
+						const sceneFit = scene.fit || scene.imageFit;
+						const sceneFadeIn = scene.fadeIn !== undefined ? scene.fadeIn : scene.imageFadeIn;
+						const sceneFadeOut = scene.fadeOut !== undefined ? scene.fadeOut : scene.imageFadeOut;
+
+						// Shuffle picks random effect for non-explicit fields
+						let shuffleEffect: string | undefined;
+						if (d.shuffleEnabled) {
+							const FX = ['zoomIn','zoomOut','slideLeft','slideRight','slideUp','slideDown','zoomInFast','zoomOutFast'];
+							shuffleEffect = FX[Math.floor(Math.random() * FX.length)];
+						}
+
+						// Resolve: scene > shuffle > UI default > hardcoded
+						const effect = sceneEffect || shuffleEffect || (d.imageEffect as string) || 'zoomIn';
+						const fit = sceneFit || (d.imageFit as string) || 'cover';
+						const fadeIn = sceneFadeIn !== undefined ? !!sceneFadeIn : !!d.imageFadeIn;
+						const fadeOut = sceneFadeOut !== undefined ? !!sceneFadeOut : !!d.imageFadeOut;
 
 						// Per-item text overrides
 						const fontFamily = getVal(scene, ['fontFamily'], d.fontFamily) || 'Inter';

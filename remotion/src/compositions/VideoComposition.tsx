@@ -139,13 +139,27 @@ function getTextAnimationStyle(
 }
 
 // ================================================================
-// Image Scene
+// Image Scene (with fade in/out support)
 // ================================================================
 const ImageScene: React.FC<{ clip: Clip; totalFrames: number }> = ({ clip, totalFrames }) => {
   const frame = useCurrentFrame();
   const kb = getKenBurns(clip.effect as KenBurnsEffect, frame, totalFrames);
+
+  // Fade in/out based on clip.transition
+  const fadeFrames = Math.min(15, Math.floor(totalFrames * 0.2));
+  let opacity = 1;
+  if (clip.transition?.in === 'fade') {
+    opacity *= interpolate(frame, [0, fadeFrames], [0, 1],
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  }
+  if (clip.transition?.out === 'fade') {
+    const fadeOutStart = Math.max(totalFrames - fadeFrames, 0);
+    opacity *= interpolate(frame, [fadeOutStart, totalFrames], [1, 0],
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  }
+
   return (
-    <AbsoluteFill style={{ overflow: "hidden" }}>
+    <AbsoluteFill style={{ overflow: "hidden", opacity }}>
       <Img src={clip.asset.src!} style={{ width: "100%", height: "100%", objectFit: (clip as any).fit || "cover", ...kb }} />
     </AbsoluteFill>
   );

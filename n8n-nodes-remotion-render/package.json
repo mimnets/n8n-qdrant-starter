@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-remotion-render",
-  "version": "0.5.4",
+  "version": "0.5.7",
   "description": "n8n community node for rendering videos using your self-hosted Remotion server. Supports Manual timeline and Batch Render (each scene rendered individually, concat with ffmpeg, returns binary). No internal file upload — you control the upload strategy.",
   "keywords": [
     "n8n",
